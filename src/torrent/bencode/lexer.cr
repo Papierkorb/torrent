@@ -138,10 +138,10 @@ module Torrent
         (byte - DIGIT_LOW).to_i64
       end
 
-      private def consume_byte_string : Slice(UInt8)
+      private def consume_byte_string : Bytes
         length = read_integer(LENGTH_SIGN)
 
-        data = Slice(UInt8).new(length)
+        data = Bytes.new(length)
         @io.read_fully(data)
 
         @position += length

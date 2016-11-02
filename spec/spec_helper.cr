@@ -1,4 +1,3 @@
-require "spec" # TODO: Remove me
 require "spec2"
 require "cute/spec"
 require "../src/torrent"

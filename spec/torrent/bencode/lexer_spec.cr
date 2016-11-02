@@ -1,72 +1,84 @@
 require "../../spec_helper"
 
-private def it_lexes(string, expected : Array(Torrent::Bencode::Token))
-  it "lexes #{string.inspect}" do
-    lexer = Torrent::Bencode::Lexer.new(MemoryIO.new(string.to_slice))
+Spec2.describe Torrent::Bencode::Lexer do
+  it "lexes" do
+    [
+      { "i123e", [ Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::Integer, 123i64) ]},
+      { "i-456e", [ Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::Integer, -456i64) ]},
+      { "4:spam", [ Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::ByteString, 0i64, "spam".to_slice) ]},
+      { "3:foo3:bar", [
+        Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::ByteString, 0i64, "foo".to_slice),
+        Torrent::Bencode::Token.new(5, Torrent::Bencode::TokenType::ByteString, 0i64, "bar".to_slice) ]},
+      { "5:yaddai0e", [
+        Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::ByteString, 0i64, "yadda".to_slice),
+        Torrent::Bencode::Token.new(7, Torrent::Bencode::TokenType::Integer, 0i64) ]},
+      { "de", [
+        Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::Dictionary, 0i64),
+        Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::EndMarker, 0i64)
+      ]},
+      { "le", [
+        Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::List, 0i64),
+        Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::EndMarker, 0i64)
+      ]},
+      { "li123ee", [
+        Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::List, 0i64),
+        Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::Integer, 123i64),
+        Torrent::Bencode::Token.new(6, Torrent::Bencode::TokenType::EndMarker, 0i64)
+      ]},
+      { "l2:eee", [
+        Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::List, 0i64),
+        Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::ByteString, 0i64, "ee".to_slice),
+        Torrent::Bencode::Token.new(5, Torrent::Bencode::TokenType::EndMarker, 0i64)
+      ]},
+      { "l0:e", [
+        Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::List, 0i64),
+        Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::ByteString, 0i64, "".to_slice),
+        Torrent::Bencode::Token.new(3, Torrent::Bencode::TokenType::EndMarker, 0i64)
+      ]},
+      { "llee", [
+        Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::List, 0i64),
+        Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::List, 0i64),
+        Torrent::Bencode::Token.new(2, Torrent::Bencode::TokenType::EndMarker, 0i64),
+        Torrent::Bencode::Token.new(3, Torrent::Bencode::TokenType::EndMarker, 0i64)
+      ]}
+    ].each do |string, expected|
+      lexer = Torrent::Bencode::Lexer.new(MemoryIO.new(string.to_slice))
 
-    expected.each do |tok|
-      lexer.next_token.should eq tok
+      expected.each do |tok|
+        expect(lexer.next_token).to eq tok
+      end
+
+      expect(lexer.next_token).to eq Torrent::Bencode::Token.new(
+        position: string.size,
+        type: Torrent::Bencode::TokenType::Eof
+      )
+
+      expect(lexer.eof?).to be_true
     end
-
-    lexer.next_token.should eq Torrent::Bencode::Token.new(
-      position: string.size,
-      type: Torrent::Bencode::TokenType::Eof
-    )
-
-    lexer.eof?.should be_true
   end
-end
 
-private def it_fails(string, message)
-  it "fails for #{string.inspect} with #{message.inspect}" do
-    lexer = Torrent::Bencode::Lexer.new(MemoryIO.new(string.to_slice))
-    expect_raises(Torrent::Bencode::Lexer::Error, message){ lexer.next_token }
+  it "fails for 4:abc" do
+    lexer = Torrent::Bencode::Lexer.new(MemoryIO.new("4:abc".to_slice))
+    expect{ lexer.next_token }.to raise_error(Torrent::Bencode::Lexer::Error, match /premature end of string/i)
   end
-end
 
-describe Torrent::Bencode::Lexer do
-  it_lexes "i123e", [ Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::Integer, 123i64) ]
-  it_lexes "i-456e", [ Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::Integer, -456i64) ]
-  it_lexes "4:spam", [ Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::ByteString, 0i64, "spam".to_slice) ]
-  it_lexes "3:foo3:bar", [
-    Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::ByteString, 0i64, "foo".to_slice),
-    Torrent::Bencode::Token.new(5, Torrent::Bencode::TokenType::ByteString, 0i64, "bar".to_slice) ]
-  it_lexes "5:yaddai0e", [
-    Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::ByteString, 0i64, "yadda".to_slice),
-    Torrent::Bencode::Token.new(7, Torrent::Bencode::TokenType::Integer, 0i64) ]
-  it_lexes "de", [
-    Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::Dictionary, 0i64),
-    Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::EndMarker, 0i64)
-  ]
-  it_lexes "le", [
-    Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::List, 0i64),
-    Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::EndMarker, 0i64)
-  ]
-  it_lexes "li123ee", [
-    Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::List, 0i64),
-    Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::Integer, 123i64),
-    Torrent::Bencode::Token.new(6, Torrent::Bencode::TokenType::EndMarker, 0i64)
-  ]
-  it_lexes "l2:eee", [
-    Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::List, 0i64),
-    Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::ByteString, 0i64, "ee".to_slice),
-    Torrent::Bencode::Token.new(5, Torrent::Bencode::TokenType::EndMarker, 0i64)
-  ]
-  it_lexes "l0:e", [
-    Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::List, 0i64),
-    Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::ByteString, 0i64, "".to_slice),
-    Torrent::Bencode::Token.new(3, Torrent::Bencode::TokenType::EndMarker, 0i64)
-  ]
-  it_lexes "llee", [
-    Torrent::Bencode::Token.new(0, Torrent::Bencode::TokenType::List, 0i64),
-    Torrent::Bencode::Token.new(1, Torrent::Bencode::TokenType::List, 0i64),
-    Torrent::Bencode::Token.new(2, Torrent::Bencode::TokenType::EndMarker, 0i64),
-    Torrent::Bencode::Token.new(3, Torrent::Bencode::TokenType::EndMarker, 0i64)
-  ]
+  it "fails for -4:abc" do
+    lexer = Torrent::Bencode::Lexer.new(MemoryIO.new("-4:abc".to_slice))
+    expect{ lexer.next_token }.to raise_error(Torrent::Bencode::Lexer::Error, match /unknown token/i)
+  end
 
-  it_fails "4:abc", /premature end of string/i
-  it_fails "-4:abc", /unknown token/i
-  it_fails "i123", /premature end/i
-  it_fails "i12a", /unexpected byte/i
-  it_fails "z", /unknown token/i
+  it "fails for i123" do
+    lexer = Torrent::Bencode::Lexer.new(MemoryIO.new("i123".to_slice))
+    expect{ lexer.next_token }.to raise_error(Torrent::Bencode::Lexer::Error, match /premature end/i)
+  end
+
+  it "fails for i12a" do
+    lexer = Torrent::Bencode::Lexer.new(MemoryIO.new("i12a".to_slice))
+    expect{ lexer.next_token }.to raise_error(Torrent::Bencode::Lexer::Error, match /unexpected byte/i)
+  end
+
+  it "fails for z" do
+    lexer = Torrent::Bencode::Lexer.new(MemoryIO.new("z".to_slice))
+    expect{ lexer.next_token }.to raise_error(Torrent::Bencode::Lexer::Error, match /unknown token/i)
+  end
 end

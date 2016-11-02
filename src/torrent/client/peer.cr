@@ -174,7 +174,7 @@ module Torrent
         @status |= Status::ChokingPeer
         send_packet(Wire::MessageType::Choke.value)
         status_bit_set.emit Status::ChokingPeer
-        @open_requests.clear unless @fast_extension
+        @send_queue.clear unless @fast_extension
         @log.debug "Choking peer"
       end
 

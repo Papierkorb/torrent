@@ -8,10 +8,10 @@ module Torrent
       RANDOM_TRIES = 5
 
       alias Bucket = Array(UInt32)
-      alias Buckets = StaticArray(Bucket, BUCKETS)
+      alias Buckets = Array(Bucket)
 
       def initialize(@transfer : Torrent::Transfer)
-        @buckets = Buckets.new{ Bucket.new }
+        @buckets = Buckets.new(BUCKETS){ Bucket.new }
         @no_peer = Bucket.new
         @log = Util::Logger.new("PiecePicker/RarestFirst")
 
@@ -117,7 +117,7 @@ module Torrent
 
       private def rebuild_buckets(peers : Enumerable(Client::Peer))
         @dirty = false
-        @buckets = Buckets.new{ Bucket.new }
+        @buckets = Buckets.new(BUCKETS){ Bucket.new }
         @no_peer = Bucket.new
 
         @transfer.piece_count.to_u32.times do |piece_index|

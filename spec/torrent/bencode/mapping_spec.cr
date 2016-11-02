@@ -36,100 +36,96 @@ private class ConverterTest
   end
 end
 
-describe "Torrent::Bencode.mapping" do
-  context ".from_bencode" do
+Spec2.describe "Torrent::Bencode.mapping" do
+  describe ".from_bencode" do
     it "works in the general case" do
       test = Test.from_bencode("d3:fooi7e4:manyle3:numi-1ee".to_slice)
-      test.foo.should eq 7
-      test.opt.should be_nil
-      test.num.should eq -1
-      test.many.empty?.should be_true
+      expect(test.foo).to eq 7
+      expect(test.opt).to be_nil
+      expect(test.num).to eq -1
+      expect(test.many.empty?).to be_true
     end
 
     it "uses default values" do
       test = Test.from_bencode("d3:fooi7e4:manylee".to_slice)
-      test.foo.should eq 7
-      test.opt.should be_nil
-      test.num.should eq 4
-      test.many.empty?.should be_true
+      expect(test.foo).to eq 7
+      expect(test.opt).to be_nil
+      expect(test.num).to eq 4
+      expect(test.many.empty?).to be_true
     end
 
     it "works with custom key" do
       test = Test.from_bencode("d3:fooi7e4:manyle3:bar3:^_^e".to_slice)
-      test.foo.should eq 7
-      test.opt.should eq "^_^"
-      test.num.should eq 4
-      test.many.empty?.should be_true
+      expect(test.foo).to eq 7
+      expect(test.opt).to eq "^_^"
+      expect(test.num).to eq 4
+      expect(test.many.empty?).to be_true
     end
 
     it "can build recursive structures" do
       test = Test.from_bencode("d3:fooi7e4:manyld3:fooi7e4:manyle3:numi-1eeee".to_slice)
-      test.foo.should eq 7
-      test.opt.should be_nil
-      test.num.should eq 4
-      test.many.size.should eq 1
+      expect(test.foo).to eq 7
+      expect(test.opt).to be_nil
+      expect(test.num).to eq 4
+      expect(test.many.size).to eq 1
 
       inner = test.many.first
-      inner.foo.should eq 7
-      inner.opt.should be_nil
-      inner.num.should eq -1
-      inner.many.empty?.should be_true
+      expect(inner.foo).to eq 7
+      expect(inner.opt).to be_nil
+      expect(inner.num).to eq -1
+      expect(inner.many.empty?).to be_true
     end
 
     it "fails if an attribute is missing" do
-      expect_raises(Torrent::Bencode::Error, /missing/i) do
-        Test.from_bencode("d4:manylee".to_slice)
-      end
+      expect{ Test.from_bencode("d4:manylee".to_slice) }.to raise_error(Torrent::Bencode::Error, match /missing/i)
     end
 
     it "ignores unknown attributes" do
       test = Test.from_bencode("d7:unknownd3:fooi9ee3:fooi7e4:manylee".to_slice)
-      test.foo.should eq 7
-      test.opt.should be_nil
-      test.num.should eq 4
-      test.many.empty?.should be_true
+      expect(test.foo).to eq 7
+      expect(test.opt).to be_nil
+      expect(test.num).to eq 4
+      expect(test.many.empty?).to be_true
     end
 
     it "supports a converter" do
       test = ConverterTest.from_bencode("d3:fooi7e3:bari4ee".to_slice)
-      test.foo.should eq 14
-      test.bar.should eq 8
+      expect(test.foo).to eq 14
+      expect(test.bar).to eq 8
     end
 
     it "supports a converter with default value" do
       test = ConverterTest.from_bencode("d3:fooi7ee".to_slice)
-      test.foo.should eq 14
-      test.bar.should eq 5
+      expect(test.foo).to eq 14
+      expect(test.bar).to eq 5
     end
   end
 
-  context ".from_bencode strict mode" do
+  describe ".from_bencode strict mode" do
     it "works with no unknown attributes" do
       test = StrictTest.from_bencode("d3:fooi7ee".to_slice)
-      test.foo.should eq 7
+      expect(test.foo).to eq 7
     end
 
     it "fails if an attribute is unknown" do
-      expect_raises(Torrent::Bencode::Error, /unknown attribute/i) do
-        StrictTest.from_bencode("d3:fooi7e3:bar3:asde".to_slice)
-      end
+      expect{ StrictTest.from_bencode("d3:fooi7e3:bar3:asde".to_slice) }.to raise_error(Torrent::Bencode::Error, match /unknown attribute/i)
     end
   end
 
-  context "#to_bencode" do
+  describe "#to_bencode" do
     it "sorts the dictionary keys" do
       test = Test.from_bencode("d4:manyld3:fooi7e4:manyle3:numi-1eee3:fooi7ee".to_slice)
-      test.to_bencode.should eq "d3:fooi7e4:manyld3:fooi7e4:manyle3:numi-1eee3:numi4ee".to_slice
+      expect(test.to_bencode).to eq "d3:fooi7e4:manyld3:fooi7e4:manyle3:numi-1eee3:numi4ee".to_slice
     end
 
     it "supports a converter" do
       test = ConverterTest.new(foo: 2, bar: 3)
-      test.to_bencode.should eq "d3:bari6e3:fooi4ee".to_slice
+      expect(test.to_bencode).to eq "d3:bari6e3:fooi4ee".to_slice
     end
 
     it "uses the custom key" do
       test = Test.new(foo: 5, opt: "Ok", num: 4, many: [ ] of Test)
-      test.to_bencode.should eq "d3:bar2:Ok3:fooi5e4:manyle3:numi4ee".to_slice
+      expect(test.to_bencode).to eq "d3:bar2:Ok3:fooi5e4:manyle3:numi4ee".to_slice
     end
   end
 end

@@ -147,7 +147,7 @@ Spec2.describe Torrent::Client::Peer do
     end
   end
 
-  context "with fast extension support" do
+  describe "with fast extension support" do
     before{ subject.fast_extension = true }
 
     describe "#send_bitfield(Util::Bitfield)" do
@@ -256,7 +256,7 @@ Spec2.describe Torrent::Client::Peer do
     end
   end
 
-  context "with NO fast extension support" do
+  describe "with NO fast extension support" do
     before{ subject.fast_extension = false }
 
     describe "#send_bitfield(Util::Bitfield)" do
@@ -328,7 +328,7 @@ Spec2.describe Torrent::Client::Peer do
     end
   end
 
-  context "with extended protocol support" do
+  describe "with extended protocol support" do
     before{ subject.extension_protocol = true }
 
     describe "#send_extended(&block)" do
@@ -396,7 +396,7 @@ Spec2.describe Torrent::Client::Peer do
     end
   end
 
-  context "with NO extended protocol support" do
+  describe "with NO extended protocol support" do
     before{ subject.extension_protocol = false }
 
     describe "#send_extended(&block)" do
@@ -487,7 +487,8 @@ Spec2.describe Torrent::Client::Peer do
 
         expect{ subject.handle_packet(5u8, bits.data) }.to raise_error(Torrent::Client::Error, match(/sent bitfield packet/i))
 
-        expect(subject.bitfield.data).to eq empty
+        # No change here
+        expect(subject.bitfield.size).to eq file.piece_count
       end
     end
 

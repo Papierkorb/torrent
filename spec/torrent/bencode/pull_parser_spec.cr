@@ -1,45 +1,47 @@
 require "../../spec_helper"
 
-private def it_pulls(string, &block : Torrent::Bencode::PullParser -> _)
-  it string.inspect do
-    lexer = Torrent::Bencode::Lexer.new(MemoryIO.new(string.to_slice))
-    parser = Torrent::Bencode::PullParser.new(lexer)
-
-    block.call parser
-  end
+private def pull(string)
+  lexer = Torrent::Bencode::Lexer.new(MemoryIO.new(string.to_slice))
+  Torrent::Bencode::PullParser.new(lexer)
 end
 
-describe Torrent::Bencode::PullParser do
-  it_pulls("i5e", &.read_integer.should(eq 5))
-  it_pulls("4:abcd", &.read_byte_slice.should(eq "abcd".to_slice))
+Spec2.describe Torrent::Bencode::PullParser do
+  # TODO: Split into #describe/#it blocks.
+  it "#read_integer" do
+    expect(pull("i5e").read_integer).to eq 5
+  end
 
-  it_pulls("d1:ai42e1:bi1337ee") do |pull|
-    pull.read_dictionary do
-      pull.read_byte_slice.should eq "a".to_slice
-      pull.read_integer.should eq 42i64
-      pull.read_byte_slice.should eq "b".to_slice
-      pull.read_integer.should eq 1337i64
+  it "#read_byte_slice" do
+    expect(pull("4:abcd").read_byte_slice).to eq "abcd".to_slice
+  end
+
+  it "#read_dictionary" do
+    parser = pull("d1:ai42e1:bi1337ee")
+
+    parser.read_dictionary do
+      expect(parser.read_byte_slice).to eq "a".to_slice
+      expect(parser.read_integer).to eq 42i64
+      expect(parser.read_byte_slice).to eq "b".to_slice
+      expect(parser.read_integer).to eq 1337i64
     end
   end
 
-  it_pulls("l1:ai42e1:bi1337ee") do |pull|
-    pull.read_list do
-      pull.read_byte_slice.should eq "a".to_slice
-      pull.read_integer.should eq 42i64
-      pull.read_byte_slice.should eq "b".to_slice
-      pull.read_integer.should eq 1337i64
+  it "#read_list" do
+    parser = pull("l1:ai42e1:bi1337ee")
+
+    parser.read_list do
+      expect(parser.read_byte_slice).to eq "a".to_slice
+      expect(parser.read_integer).to eq 42i64
+      expect(parser.read_byte_slice).to eq "b".to_slice
+      expect(parser.read_integer).to eq 1337i64
     end
   end
 
-  it_pulls("d") do |pull|
-    expect_raises(Torrent::Bencode::PullParser::Error, /eof/i) do
-      pull.read_dictionary{ }
-    end
+  it "#read_dictionary error case" do
+    expect{ pull("d").read_dictionary{ } }.to raise_error(Torrent::Bencode::PullParser::Error, match /eof/i)
   end
 
-  it_pulls("l") do |pull|
-    expect_raises(Torrent::Bencode::PullParser::Error, /eof/i) do
-      pull.read_list{ }
-    end
+  it "#read_list error case" do
+    expect{ pull("l").read_list{ } }.to raise_error(Torrent::Bencode::PullParser::Error, match /eof/i)
   end
 end
