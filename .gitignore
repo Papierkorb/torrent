@@ -1,0 +1,9 @@
+/doc/
+/libs/
+/lib/
+/.crystal/
+/.shards/
+
+/downloads/
+download.log*
+/*.torrent
