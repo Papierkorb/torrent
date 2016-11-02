@@ -1,4 +1,4 @@
-# torrent.cr
+# torrent.cr [![Build Status](https://travis-ci.org/Papierkorb/torrent.svg?branch=master)](https://travis-ci.org/Papierkorb/torrent)
 
 A BitTorrent client library written in pure Crystal.
 
