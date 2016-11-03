@@ -121,7 +121,7 @@ module Torrent
 
     # Connects to the most promising candidates until the peer limit has been
     # reached (or the list of candidates is empty).
-    def connect_to_candidates
+    def connect_to_candidates : Nil
       Util.spawn do
         ch = Channel(Bool).new
         keep_running = true
@@ -237,7 +237,7 @@ module Torrent
       peer.connection_lost.on{ remove_peer peer }
     end
 
-    private def remove_peer(peer : Client::Peer)
+    private def remove_peer(peer : Client::Peer) : Nil
       @active_peers.delete peer
       peer_removed.emit peer
       connect_to_candidates
