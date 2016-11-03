@@ -47,6 +47,11 @@ module Torrent
           complete?
         end
 
+        # Count of block requests done
+        def count_done
+          @progress.count(&.itself)
+        end
+
         def to_a
           Array.new(@count) do |idx|
             tuple(idx)

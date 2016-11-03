@@ -36,6 +36,9 @@ module Torrent
       # than this, no matter the cause, the connection will be killed.
       MAX_PACKET_SIZE = 4 * 1024 * 1024
 
+      # Default maximum of open outgoing piece-block requests.
+      MAX_OPEN_REQUESTS = 128
+
       # The transfer of this peer connection.
       # Is a property so that we can swap the used `transfer` when operating in
       # server mode.
@@ -127,6 +130,11 @@ module Torrent
       # Mapping from the extension name to the id.
       getter extension_map : Hash(String, UInt8)
 
+      # Count of max concurrent outgoing piece-block requests.
+      # Remote peers can signal a different limit through the extension
+      # protocol.
+      property max_concurrent_requests : Int32 = MAX_OPEN_REQUESTS
+
       def initialize(@transfer : Torrent::Transfer)
         @log = Util::Logger.new("Peer")
         @bitfield = Util::Bitfield.new(@transfer.piece_count)
@@ -139,6 +147,11 @@ module Torrent
       # Sends a close command to the peer
       def close
         @command_channel.send CloseCommand.new
+      end
+
+      def max_concurrent_piece_requests
+        blocks = @transfer.piece_size / Util::RequestList::REQUEST_BLOCK_SIZE
+        @max_concurrent_requests / blocks
       end
 
       private def set_state(state : State)

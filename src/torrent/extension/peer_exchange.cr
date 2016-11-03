@@ -14,6 +14,7 @@ module Torrent
         peers = Payload.from_bencode(payload)
         add_peers peer, peers.added, "IPv4"
         add_peers peer, peers.added6, "IPv6"
+        @manager.peer_list.connect_to_candidates
       end
 
       private def add_peers(peer, list, type)
@@ -21,7 +22,7 @@ module Torrent
 
         @log.debug "Peer #{peer.address} #{peer.port} knows of #{list.size} #{type} peers"
         list.each do |info|
-          @manager.peer_list.add_candidate peer.transfer, info.address, info.port.to_u16
+          @manager.peer_list.add_candidate_bulk peer.transfer, info.address, info.port.to_u16
         end
       end
 

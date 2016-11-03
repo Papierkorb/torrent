@@ -119,6 +119,10 @@ module Torrent
         @log.info " - Peer sees us as #{handshake.yourip.inspect}"
         @log.info " - Peer accepts #{handshake.reqq.inspect} simultaneous requests"
 
+        if count = handshake.reqq
+          peer.max_concurrent_requests = count
+        end
+
         merge_peer_extensions(peer, handshake.mapping)
         handshake_received.emit(peer, handshake)
       end

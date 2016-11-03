@@ -5,21 +5,22 @@ module Torrent
     # Default maximum of concurrently connected peers
     MAX_DEFAULT_PEERS = 40
 
+    record Candidate,
+      transfer : Torrent::Transfer,
+      address : String,
+      port : UInt16,
+      ranking : Int32
+
     # List of connected peers
     getter active_peers : Array(Client::Peer)
-
-    # List of past peers. Tuples contain the address as first, the port as
-    # second and the peer-id as third element.  The peer-id may be `nil` if
-    # the peer didn't send us one, e.g. because the connect itself failed.
-    getter past_peers : Array(Tuple(String, UInt16, Bytes?))
 
     # List of addresses which the peer list will never connect to.
     # Override `#blacklisted?` if you need a more complex handling than just a
     # local list of address strings.
-    getter blacklist : Array(Tuple(String))
+    getter blacklist : Array(String)
 
     # List of peers which we may want to connect to.
-    getter candidates : Deque(Tuple(Transfer, String, UInt16))
+    getter candidates : Deque(Candidate)
 
     # Maximum count of concurrently connected peers.  Note that if you set this
     # value to something less than `active_peers.size`, no peers will be
@@ -29,7 +30,7 @@ module Torrent
 
     # Emitted when a new candidate was added.  Note that if the candidate is
     # connected to right away, this signal will not be emitted.
-    Cute.signal candidate_added(transfer : Transfer, address : String, port : UInt16)
+    Cute.signal candidate_added(candidate : Candidate)
 
     # Emitted when a new peer was added
     Cute.signal peer_added(peer : Client::Peer)
@@ -40,9 +41,8 @@ module Torrent
     def initialize(@max_peers = MAX_DEFAULT_PEERS)
       @log = Util::Logger.new("PeerList")
       @active_peers = Array(Client::Peer).new
-      @past_peers = Array(Tuple(String, UInt16, Bytes?)).new
-      @blacklist = Array(Tuple(String)).new
-      @candidates = Deque(Tuple(Transfer, String, UInt16)).new
+      @blacklist = Array(String).new
+      @candidates = Deque(Candidate).new
       @log.context = self
     end
 
@@ -54,7 +54,13 @@ module Torrent
 
     # Returns `true` if *address:port* is a known candidate.
     def candidate?(transfer : Transfer, address : String, port : UInt16) : Bool
-      @candidates.includes?({ transfer, address, port })
+      found = @candidates.find do |candidate|
+        candidate.transfer == transfer && \
+        candidate.address == address && \
+        candidate.port == port
+      end
+
+      found != nil
     end
 
     # Returns `true` if *address:port* is a currently connected-to peer.
@@ -91,19 +97,79 @@ module Torrent
     #
     # Returns `true` if the candidate was added, or `false` if the candidate
     # is already known or if it's blacklisted.
+    #
+    # Note, if you're adding lots of candidates, use `#add_candidate_bulk`
+    # instead to make use of the ranking mechanism.
     def add_candidate(transfer : Transfer, address : String, port : UInt16) : Bool
-      return false if blacklisted?(address)
-      return false if known?(transfer, address, port)
+      added = add_candidate_bulk(transfer, address, port)
+      connect_to_candidates if added
+      added
+    end
 
-      if @active_peers.size < @max_peers
-        Util.spawn{ connect_to_peer(transfer, address, port) }
-      else
-        @log.info "Adding candidate #{address}:#{port} for transfer #{transfer}"
-        @candidates << { transfer, address, port }
-        candidate_added.emit transfer, address, port
+    # Like `#add_candidate`, but will not conenct to the peer right away if the
+    # max peer count has not been reached.
+    #
+    # Use `#connect_to_candidates` afterwards.
+    def add_candidate_bulk(transfer : Transfer, address : String, port : UInt16) : Bool
+      ranking = check_candidate_ranking(transfer, address, port)
+      return false if ranking < 1
+
+      candidate = Candidate.new transfer, address, port, ranking
+      push_candidate candidate
+      true
+    end
+
+    # Connects to the most promising candidates until the peer limit has been
+    # reached (or the list of candidates is empty).
+    def connect_to_candidates
+      Util.spawn do
+        ch = Channel(Bool).new
+        keep_running = true
+
+        while keep_running
+          tries = @candidates.size.clamp(0, @max_peers - @active_peers.size)
+          break if tries == 0
+
+          tries.times do
+            Util.spawn{ ch.send connect_to_next_candidate }
+          end
+
+          tries.times{ keep_running &&= ch.receive }
+        end
+      end
+    end
+
+    private def connect_to_next_candidate
+      return false if @candidates.empty?
+      return false if peer_limit_reached?
+
+      record = @candidates.shift
+      connect_to_peer(record.transfer, record.address, record.port)
+      true
+    end
+
+    private def check_candidate_ranking(transfer, address, port)
+      return 0 if blacklisted?(address)
+      return 0 if known?(transfer, address, port)
+
+      transfer.leech_strategy.candidate_ranking(address, port)
+    end
+
+    # Pushes the *record* into the sorted (by ranking, descending) candidate
+    # list.
+    private def push_candidate(record)
+      @log.info "Adding candidate #{record.address}:#{record.port} for transfer #{record.transfer}"
+
+      added = false
+      @candidates.each_with_index do |cand, idx|
+        next if cand.ranking > record.ranking
+        @candidates.insert idx + 1, record
+        added = true
+        break
       end
 
-      true
+      @candidates << record unless added
+      candidate_added.emit record
     end
 
     # Connects to the given peer right away.  This circumvents the candidate
@@ -116,6 +182,12 @@ module Torrent
     def connect_to_peer(transfer : Transfer, address : String, port : UInt16) : Bool
       @log.info "Connecting to #{address}:#{port} for transfer #{transfer}"
       if peer = create_tcp_peer(transfer, address, port)
+        if peer_limit_reached? # Has the limit been reached in the meantime?
+          peer.close
+          add_candidate_bulk(transfer, address, port)
+          return false
+        end
+
         add_peer peer
         peer.send_handshake
         true
@@ -168,16 +240,7 @@ module Torrent
     private def remove_peer(peer : Client::Peer)
       @active_peers.delete peer
       peer_removed.emit peer
-      Util.spawn{ connect_to_next_candidate }
-    end
-
-    private def connect_to_next_candidate
-      while !@candidates.empty? && !peer_limit_reached?
-        transfer, address, port = @candidates.shift
-        next if blacklisted?(address)
-
-        connect_to_peer(transfer, address, port)
-      end
+      connect_to_candidates
     end
 
     private def create_tcp_peer(transfer, address, port)

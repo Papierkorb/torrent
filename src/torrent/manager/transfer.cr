@@ -128,8 +128,10 @@ module Torrent
 
       private def add_peers(list)
         (list.peers + list.peers6).each do |data|
-          @peer_list.add_candidate transfer, data.address, data.port.to_u16
+          @peer_list.add_candidate_bulk transfer, data.address, data.port.to_u16
         end
+
+        @peer_list.connect_to_candidates
       end
 
       private def broadcast_have_packet(_peer, piece, _length)

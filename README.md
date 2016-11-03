@@ -25,7 +25,7 @@ Please see `bin/` for example applications.
 * Smarter leech and seed strategies
 * Tons of other things
 * The planned BEPs
-* More tests, also moving existing tests over to `Spec2`
+* More tests
 
 ## Implemented BEPs
 
