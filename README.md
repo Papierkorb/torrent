@@ -25,7 +25,7 @@ Please see `bin/` for example applications.
 * Smarter leech and seed strategies
 * Tons of other things
 * The planned BEPs
-* More tests
+* More tests (Figure out how to best test networking code)
 
 ## Implemented BEPs
 
@@ -35,7 +35,7 @@ The index of all BEPs can be found at http://www.bittorrent.org/beps/bep_0000.ht
 * BEP-0006: Fast Extension
 * BEP-0010: Extension Protocol
 * BEP-0011: Peer Exchange (PEX)
-* BEP-0015: UDP Tracker Protocol for BitTorrent
+* BEP-0015: UDP Tracker Protocol for BitTorrent (*Except for scraping*)
 * BEP-0020: Peer ID Conventions
 * BEP-0023: Tracker Returns Compact Peer Lists
 * BEP-0027: Private Torrents
