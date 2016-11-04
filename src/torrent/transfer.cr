@@ -21,13 +21,13 @@ module Torrent
     enum Status
 
       # The transfer has stopped. Initial status.
-      Stopped
+      Stopped = 3
 
       # The transfer is currently running.
-      Running
+      Running = 2
 
       # The transfer has completed.
-      Completed
+      Completed = 1
     end
 
     # The transfer status

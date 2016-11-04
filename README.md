@@ -35,16 +35,17 @@ The index of all BEPs can be found at http://www.bittorrent.org/beps/bep_0000.ht
 * BEP-0006: Fast Extension
 * BEP-0010: Extension Protocol
 * BEP-0011: Peer Exchange (PEX)
+* BEP-0015: UDP Tracker Protocol for BitTorrent
 * BEP-0020: Peer ID Conventions
 * BEP-0023: Tracker Returns Compact Peer Lists
 * BEP-0027: Private Torrents
+* BEP-0041: UDP Tracker Protocol Extensions
 * BEP-0048: Tracker Protocol Extension: Scrape
 
 ### Planned
 
 * BEP-0005: DHT Protocol
 * BEP-0009: Extension for Peers to Send Metadata Files
-* BEP-0015: UDP Tracker Protocol for BitTorrent
 * BEP-0040: Canonical Peer Priority
 
 *All entries are in ascending order of their BEP number*

@@ -106,7 +106,7 @@ module Torrent
 
       private def add_trackers_from_file
         added = @file.announce_list.map do |url|
-          Client::Tracker.new(URI.parse url)
+          Client::Tracker.from_url(URI.parse url)
         end
 
         trackers.concat added
@@ -127,7 +127,7 @@ module Torrent
       end
 
       private def add_peers(list)
-        (list.peers + list.peers6).each do |data|
+        list.each do |data|
           @peer_list.add_candidate_bulk transfer, data.address, data.port.to_u16
         end
 

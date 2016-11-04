@@ -87,6 +87,54 @@ module Torrent
           message_id : UInt8,
         )
       end
+
+      # UDP tracker
+
+      struct TrackerConnectRequest < Util::NetworkOrderStruct(Wire::TrackerConnectRequest)
+        fields(
+          connection_id : UInt64,
+          action : Int32, # = TrackerAction::Connect
+          transaction_id : UInt32,
+        )
+      end
+
+      struct TrackerConnectResponse < Util::NetworkOrderStruct(Wire::TrackerConnectResponse)
+        fields(
+          action : Int32, # = TrackerAction::Connect
+          transaction_id : UInt32,
+          connection_id : UInt64,
+        )
+      end
+
+      struct TrackerAnnounceRequest < Util::NetworkOrderStruct(Wire::TrackerAnnounceRequest)
+        fields(
+          connection_id : UInt64,
+          action : Int32, # = TrackerAction::Announce
+          transaction_id : UInt32,
+          info_hash : UInt8[20],
+          peer_id : UInt8[20],
+          downloaded : UInt64,
+          left : UInt64,
+          uploaded : UInt64,
+          event : Int32,
+          ip_address : UInt32, # default: 0
+          key : UInt32,
+          num_want : Int32, # default: -1
+          port : UInt16,
+        )
+      end
+
+      struct TrackerAnnounceResponse < Util::NetworkOrderStruct(Wire::TrackerAnnounceResponse)
+        fields(
+          action : Int32, # = TrackerAction::Announce
+          transaction_id : UInt32,
+          interval : Int32,
+          leechers : Int32,
+          seeders : Int32,
+          # v4 addresses: 4 * x Bytes
+          # v4 ports: 2 * x Bytes
+        )
+      end
     end
   end
 end

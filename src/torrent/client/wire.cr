@@ -99,5 +99,62 @@ module Torrent
     struct Extended
       message_id : UInt8
     end
+
+    # UDP tracker protocol
+    enum TrackerAction : Int32
+      Connect = 0
+      Announce = 1
+      Scrape = 2
+      Error = 3
+    end
+
+    enum TrackerEvent : Int32
+      None = 0
+      Completed = 1
+      Started = 2
+      Stopped = 3
+    end
+
+    @[Packed]
+    struct TrackerConnectRequest
+      connection_id : UInt64
+      action : Int32 # = TrackerAction::Connection
+      transaction_id : UInt32
+    end
+
+    @[Packed]
+    struct TrackerConnectResponse
+      action : Int32 # = TrackerAction::Connection
+      transaction_id : UInt32
+      connection_id : UInt64
+    end
+
+    @[Packed]
+    struct TrackerAnnounceRequest
+      connection_id : UInt64
+      action : Int32 # = TrackerAction::Announce
+      transaction_id : UInt32
+      info_hash : UInt8[20]
+      peer_id : UInt8[20]
+      downloaded : UInt64
+      left : UInt64
+      uploaded : UInt64
+      event : Int32
+      ip_address : UInt32 # default: 0
+      key : UInt32 # default: 0
+      num_want : Int32 # default: -1
+      port : UInt16
+    end
+
+    @[Packed]
+    struct TrackerAnnounceResponse
+      action : Int32 # = TrackerAction::Announce
+      transaction_id : UInt32
+      interval : Int32
+      leechers : Int32
+      seeders : Int32
+      # v4 addresses: 4 * x Bytes
+      # v4 ports: 2 * x Bytes
+    end
   end
 end
