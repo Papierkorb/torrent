@@ -166,6 +166,9 @@ module Torrent
 
         # Information dictionary on the files
         info: { type: InfoDictionary, converter: InfoDictionaryConverter },
+
+        # Is this torrent private? (BEP-0027)
+        private: { type: Bool, default: false },
       )
     end
 

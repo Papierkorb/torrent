@@ -10,7 +10,13 @@ module Torrent
       end
 
       def invoke(peer : Client::Peer, payload : Bytes)
-        @log.debug "Peer exchanged peers with us"
+        @log.info "Peer exchanged peers"
+
+        if peer.transfer.private?
+          @log.info "Ignoring as the torrent is private"
+          return
+        end
+
         peers = Payload.from_bencode(payload)
         add_peers peer, peers.added, "IPv4"
         add_peers peer, peers.added6, "IPv6"
