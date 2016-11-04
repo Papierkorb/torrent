@@ -5,5 +5,5 @@
 /.shards/
 
 /downloads/
-download.log*
+*.log*
 /*.torrent
