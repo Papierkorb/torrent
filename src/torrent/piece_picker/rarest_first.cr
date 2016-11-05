@@ -13,6 +13,7 @@ module Torrent
       def initialize(@transfer : Torrent::Transfer)
         @buckets = Buckets.new(BUCKETS){ Bucket.new }
         @no_peer = Bucket.new
+        @dirty = true
         @log = Util::Logger.new("PiecePicker/RarestFirst")
 
         @transfer.manager.peer_list.peer_added.on do |peer|
