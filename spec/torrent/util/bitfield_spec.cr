@@ -8,7 +8,7 @@ private def bitfield(*bytes)
   Torrent::Util::Bitfield.new(data)
 end
 
-Spec2.describe "Torrent::Util::Bitfield" do
+Spec2.describe Torrent::Util::Bitfield do
   describe ".bytesize" do
     it "returns the bytes needed" do
       expect(Torrent::Util::Bitfield.bytesize(32)).to eq 4
@@ -143,22 +143,38 @@ Spec2.describe "Torrent::Util::Bitfield" do
   describe "#each(Bool)" do
     it "yields each true bit index" do
       expected = [ 0, 5, 15 ]
+      actual = [ ] of Int32
 
-      bitfield(0x84, 0x01).each(true) do |idx|
-        expected.delete(idx)
-      end
-
-      expect(expected.empty?).to be_true
+      bitfield(0x84, 0x01).each(true){|idx| actual << idx}
+      expect(actual).to eq expected
     end
 
     it "yields each false bit index" do
       expected = [ 1, 2, 3, 4, 6, 7, 8, 9, 10, 11, 12, 13, 14 ]
+      actual = [ ] of Int32
 
-      bitfield(0x84, 0x01).each(false) do |idx|
-        expected.delete(idx)
+      bitfield(0x84, 0x01).each(false){|idx| actual << idx}
+      expect(actual).to eq expected
+    end
+  end
+
+  describe ".restore" do
+    context "if the byte size does not match" do
+      it "raises" do
+        expect{ described_class.restore 1, "1122" }.to raise_error(ArgumentError)
+        expect{ described_class.restore 9, "11" }.to raise_error(ArgumentError)
       end
+    end
 
-      expect(expected.empty?).to be_true
+    it "builds a bitfield" do
+      bits = described_class.restore 15, "1234"
+      expect(bits.size).to eq 15
+      expect(bits.data.hexstring).to eq "1234"
+
+      expected = [ 3, 6, 10, 11, 13 ]
+      actual = [ ] of Int32
+      bits.each(true){|idx| actual << idx}
+      expect(actual).to eq expected
     end
   end
 end

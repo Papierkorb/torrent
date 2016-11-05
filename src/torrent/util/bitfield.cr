@@ -24,6 +24,31 @@ module Torrent
         raise ArgumentError.new("size must be <= data.size * 8") unless @size <= data.size * BITS_PER_BYTE
       end
 
+      # Restores a bitfield from a hexstring, as built by `Slice#hexstring`.
+      #
+      # **Warning**: The *hexstring* must be a string containing only lower-case
+      # hexdigits.
+      def self.restore(bit_size : Int32, hexstring : String)
+        "0123456789abcdef"
+        bytes = hexstring.to_slice
+        if bytes.size != bytesize(bit_size) * 2
+          raise ArgumentError.new("Wrong hexstring length for bit count")
+        end
+
+        data = Bytes.new(bytes.size / 2) do |idx|
+          from_hex(bytes[idx * 2]) << 4 | from_hex(bytes[idx * 2 + 1])
+        end
+
+        new(data, bit_size)
+      end
+
+      # Mirrors `Slice#to_hex`
+      private def self.from_hex(c : UInt8) : UInt8
+        (c < 0x61) ? c - 0x30 : c - 0x61 + 10
+      end
+
+      # Returns the count of bytes needed to house a bitfield of *bit_count*
+      # bits.
       def self.bytesize(bit_count)
         bytes = bit_count / BITS_PER_BYTE
         bytes += 1 unless bit_count.divisible_by? BITS_PER_BYTE
