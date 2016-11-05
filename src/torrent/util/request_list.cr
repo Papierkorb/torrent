@@ -87,9 +87,18 @@ module Torrent
       # Open piece requests
       getter pieces : Array(Tuple(Client::Peer, Piece))
 
-      def initialize(piece_count, @total_size : UInt64)
-        @public_bitfield = Bitfield.new(piece_count)
-        @private_bitfield = @public_bitfield.clone
+      # Creates a RequestList for a *piece_count* long transfer of *total_size*
+      # in bytes.  If a *bitfield* is given, it is used, else a sufficient one
+      # in size will be created.
+      def initialize(piece_count, @total_size : UInt64, bitfield = nil)
+        if bitfield.nil?
+          bitfield = Bitfield.new(piece_count)
+        else
+          raise ArgumentError.new("Bitfield is not large enough") if bitfield.size < piece_count
+        end
+
+        @public_bitfield = bitfield
+        @private_bitfield = bitfield.clone
         @pieces = Array(Tuple(Client::Peer, Piece)).new
       end
 

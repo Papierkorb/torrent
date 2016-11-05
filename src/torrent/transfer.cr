@@ -82,10 +82,69 @@ module Torrent
       @peer_id = peer_id || Transfer.generate_peer_id
 
       @requests = Util::RequestList.new(@file.piece_count, @file.total_size)
-      @log = Util::Logger.new("Transfer")
+      @leech_strategy = LeechStrategy::Default.new
+      @log = Util::Logger.new(log_context)
+    end
+
+    # Builds an instance out of *resume*, which was previously created by
+    # `#save`.  Use this to resume a transfer at a later point.
+    #
+    # Raises if the *file*s `File#info_hash` does not match the one in the
+    # *resume* data.
+    #
+    # The *peer_id* argument is a bit special. If it is a `String`, it will be
+    # used as the peer id. If it is `true`, it will be restored from the resume
+    # data. If it is `false`, a new random one will be calculated.
+    def initialize(resume, @file, @manager, @piece_picker = PiecePicker::Sequential.new, peer_id : String | Bool = true)
+      if @file.hexstring != @resume["info_hash"].as(String)
+        raise ArgumentError.new("Wrong file given for resume data")
+      end
+
+      if @file.piece_count != @resume["bitfield_size"].as(Int32)
+        raise ArgumentError.new("Wrong bitfield_size for file piece count")
+      end
+
+      if peer_id.is_a?(String)
+        @peer_id = peer_id
+      elsif peer_id
+        @peer_id = resume["peer_id"]
+      else
+        @peer_id = Transfer.generate_peer_id
+      end
+
+      @uploaded = resume["uploaded"].as(UInt64)
+      @downloaded = resume["downloaded"].as(UInt64)
+      @status = Status.parse resume["status"].as(String)
+
+      bit_count = resume["bitfield_size"].as(Int32)
+      bit_data = resume["bitfield_data"].as(String)
+      bitfield = Util::Bitfield.restore(bit_count, bit_data)
+      @requests = Util::RequestList.new(@file.piece_count, @file.total_size, bitfield)
 
       @leech_strategy = LeechStrategy::Default.new
-      @log.context = "Transfer/#{@file.info_hash[0, 10].hexstring}"
+      @log = Util::Logger.new(log_context)
+    end
+
+    private def log_context
+      "Transfer/#{@file.info_hash[0, 10].hexstring}"
+    end
+
+    # Returns a `Hash` containing all data needed to restore the internal state
+    # of a `Transfer` at a later point, e.g. to resume a download at a later
+    # point.
+    #
+    # **Note**: This does **not** save the used piece picker or strategies.
+    # You have to do this yourself.
+    def save
+      {
+        "uploaded" => @uploaded,
+        "downloaded" => @downloaded,
+        "peer_id" => @peer_id,
+        "status" => @status.to_s,
+        "info_hash" => info_hash.hexstring,
+        "bitfield_data" => @requests.public_bitfield.data.hexstring,
+        "bitfield_size" => @requests.public_bitfield.size,
+      }
     end
 
     # Returns the count of bytes left to download

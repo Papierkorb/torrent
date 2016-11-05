@@ -10,6 +10,9 @@ development_dependencies:
     github: waterlink/spec2.cr
     commit: eef5144d86f3aadf95811ffc0450be389db36fed
     # version: ~> 0.9
+  spec2-mocks:
+    github: waterlink/spec2-mocks.cr
+    version: ~> 0.4
 
 authors:
   - Stefan Merettig <stefan-merettig@nuriaproject.org>
