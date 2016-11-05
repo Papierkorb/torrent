@@ -24,7 +24,7 @@ class TestPeer < Torrent::Client::Peer
   setter fast_extension
 
   def initialize(transfer)
-    super(transfer)
+    super(transfer.manager, transfer)
     @packets = Array(Packet).new
   end
 

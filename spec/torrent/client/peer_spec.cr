@@ -13,14 +13,15 @@ end
 Spec2.describe Torrent::Client::Peer do
   let(:file){ Torrent::File.read("#{__DIR__}/../../fixtures/debian.torrent") }
   let(:file_manager){ Torrent::FileManager::FileSystem.new("/tmp") }
-  let(:manager){ Torrent::Manager::Transfer.new(file, file_manager) }
+  let(:manager){ Torrent::Manager::Transfer.new(file_manager) }
+  let(:transfer){ manager.add_transfer file }
 
   let(:empty){ Bytes.new(0) }
 
   let!(:set_spy){ Cute.spy subject, status_bit_set(bit : Torrent::Client::Peer::Status) }
   let!(:cleared_spy){ Cute.spy subject, status_bit_cleared(bit : Torrent::Client::Peer::Status) }
 
-  subject{ TestPeer.new(manager.transfer) }
+  subject{ TestPeer.new(transfer) }
 
   before do
     subject.extension_map["foo"] = 5u8

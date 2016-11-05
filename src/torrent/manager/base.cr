@@ -16,9 +16,6 @@ module Torrent
       # Remove peers which have not sent a packet after some time
       PEER_TIMEOUT = 1.minutes
 
-      # List of torrent trackers
-      getter trackers : Array(Client::Tracker)
-
       # The peer list.  If you want to replace the peer list, do so right after
       # creating the manager.
       property peer_list : PeerList
@@ -29,7 +26,6 @@ module Torrent
       def initialize
         @log = Util::Logger.new("Torrent::Manager")
         @peer_list = PeerList.new
-        @trackers = Array(Client::Tracker).new
         @extensions = Extension::Manager.new
       end
 

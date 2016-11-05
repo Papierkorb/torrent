@@ -11,10 +11,11 @@ file = Torrent::File.read(ARGV[0])
 
 Dir.mkdir_p("downloads") # Create transfer manager(s)
 files = Torrent::FileManager::FileSystem.new("downloads")
-manager = Torrent::Manager::Transfer.new(file, files)
+manager = Torrent::Manager::Transfer.new(files)
+transfer = manager.add_transfer file
 
-picker = Torrent::PiecePicker::RarestFirst.new(manager.transfer)
-manager.transfer.piece_picker = picker
+picker = Torrent::PiecePicker::RarestFirst.new(transfer)
+transfer.piece_picker = picker
 
 logger = Logger.new(File.open("download.log", "w")) # Logger
 logger.level = Logger::DEBUG
@@ -22,7 +23,7 @@ Torrent.logger = logger
 manager.start! # Begin downloading the torrent!
 start_time = Time.now
 
-manager.transfer.download_completed.on do # Be notified when we're done
+transfer.download_completed.on do # Be notified when we're done
   elapsed = Time.now - start_time
   puts "-> Finished download after #{elapsed}"
   # exit 0
@@ -72,11 +73,13 @@ end
 def render_screen(manager, peers, io, runtime)
   io.print "\e[;H\e[0J" # Clear screen
 
-  done = manager.transfer.pieces_done
-  total = manager.transfer.piece_count
+  transfer = manager.transfers.first
+  file = transfer.file
+  done = transfer.pieces_done
+  total = transfer.piece_count
   total_sec = 0
   percent = (done.to_f64 / total.to_f64 * 100.0).to_i.to_s
-  io.print "Torrent #{manager.file.info_hash[0, 10].hexstring} - PEERS " \
+  io.print "Torrent #{file.info_hash[0, 10].hexstring} - PEERS " \
            "#{manager.peers.size} / #{peers.size} " \
            "+#{manager.peer_list.candidates.size} - #{percent.rjust 3}% " \
            "[#{done} / #{total} ETA #{estimate total, done, runtime}]  " \
@@ -96,7 +99,7 @@ def render_screen(manager, peers, io, runtime)
     total_sec += down_sec
 
     peers[peer] = peer.bytes_received
-    pieces = manager.transfer.requests.pieces_of_peer(peer).map(&.index).join(", ")
+    pieces = transfer.requests.pieces_of_peer(peer).map(&.index).join(", ")
     flags = [
       (peer.status.choked_by_peer? ? 'C' : 'c'),
       (peer.status.interested_in_peer? ? 'I' : 'i'),

@@ -3,7 +3,7 @@ require "../spec_helper"
 Spec2.describe Torrent::Transfer do
   let(:file){ Torrent::File.read("#{__DIR__}/../fixtures/debian.torrent") }
   let(:file_manager){ Torrent::FileManager::FileSystem.new("/tmp") }
-  let(:manager){ Torrent::Manager::Transfer.new(file, file_manager) }
+  let(:manager){ Torrent::Manager::Transfer.new(file_manager) }
 
   let(:downloaded){ 1000u64 }
   let(:uploaded){ 100u64 }

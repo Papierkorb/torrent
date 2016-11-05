@@ -42,7 +42,10 @@ module Torrent
       # The transfer of this peer connection.
       # Is a property so that we can swap the used `transfer` when operating in
       # server mode.
-      property transfer : Torrent::Transfer
+      property! transfer : Torrent::Transfer
+
+      # The transfer manager of this peer
+      getter manager : Manager::Base
 
       # Current state of the peer connection
       getter state : State = State::NotConnected
@@ -135,9 +138,12 @@ module Torrent
       # protocol.
       property max_concurrent_requests : Int32 = MAX_OPEN_REQUESTS
 
-      def initialize(@transfer : Torrent::Transfer)
+      def initialize(@manager : Manager::Base, @transfer : Torrent::Transfer?)
         @log = Util::Logger.new("Peer")
-        @bitfield = Util::Bitfield.new(@transfer.piece_count)
+
+        t = @transfer
+        @bitfield = Util::Bitfield.new(t ? t.piece_count : 0)
+
         @send_queue = Deque(Tuple(UInt32, UInt32, UInt32)).new
         @command_channel = Channel(Command).new
         @extension_map = Hash(String, UInt8).new
@@ -150,7 +156,7 @@ module Torrent
       end
 
       def max_concurrent_piece_requests
-        blocks = @transfer.piece_size / Util::RequestList::REQUEST_BLOCK_SIZE
+        blocks = transfer.piece_size / Util::RequestList::REQUEST_BLOCK_SIZE
         @max_concurrent_requests / blocks
       end
 
@@ -384,13 +390,13 @@ module Torrent
 
           handle_have(payload)
         when Wire::MessageType::Bitfield
-          byte_count = Util::Bitfield.bytesize(@transfer.piece_count)
+          byte_count = Util::Bitfield.bytesize(transfer.piece_count)
 
           if payload.size != byte_count
             raise Error.new("Peer sent Bitfield packet of size #{payload.size}, but expected was #{byte_count}")
           end
 
-          @bitfield = Util::Bitfield.new(payload, @transfer.piece_count)
+          @bitfield = Util::Bitfield.new(payload, transfer.piece_count)
           bitfield_received.emit
         when Wire::MessageType::Request
           if payload.size != sizeof(Wire::Request)
@@ -417,10 +423,10 @@ module Torrent
 
           handle_extended(payload)
         when Wire::MessageType::HaveAll
-          @bitfield = Util::Bitfield.new(@transfer.piece_count, 0xFFu8)
+          @bitfield = Util::Bitfield.new(transfer.piece_count, 0xFFu8)
           bitfield_received.emit
         when Wire::MessageType::HaveNone
-          @bitfield = Util::Bitfield.new(@transfer.piece_count, 0u8)
+          @bitfield = Util::Bitfield.new(transfer.piece_count, 0u8)
           bitfield_received.emit
         when Wire::MessageType::SuggestPiece
           if payload.size != sizeof(Wire::Have)
@@ -483,7 +489,7 @@ module Torrent
         (packet + 1).copy_from(piece.to_bytes)
 
         @log.debug "Sending piece #{request.index} [#{request.start}, #{request.length}]"
-        @transfer.read_piece_for_upload(request.index, request.start, data)
+        transfer.read_piece_for_upload(request.index, request.start, data)
         send_data packet
       rescue error
         @log.error "Failed to fulfill request #{request.index} [#{request.start}, #{request.length}]"
@@ -502,7 +508,7 @@ module Torrent
         data = payload + sizeof(Wire::Extended)
 
         @log.debug "Peer invokes extension #{header.message_id} with payload of #{data.size} Bytes"
-        @transfer.manager.extensions.invoke(self, header.message_id, data)
+        @manager.extensions.invoke(self, header.message_id, data)
       end
 
       private def handle_rejection(payload)

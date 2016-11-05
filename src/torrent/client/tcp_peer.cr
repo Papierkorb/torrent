@@ -11,8 +11,8 @@ module Torrent
       @io : Util::AsyncIoChannel
 
       # Creates a peer through *socket*.
-      def initialize(transfer : Torrent::Transfer, @socket : IPSocket)
-        super transfer
+      def initialize(manager : Manager::Base, transfer : Torrent::Transfer?, @socket : IPSocket)
+        super manager, transfer
         @handshake_sent = false
         @state = State::NotConnected
         @io = Util::AsyncIoChannel.new(@socket)
@@ -68,8 +68,8 @@ module Torrent
         # See `Torrent::Wire` documentation for an explanation of the handshake
         # packet flow.
         @socket.write Protocol::Handshake.create.to_bytes # Step 1
-        @socket.write @transfer.info_hash                 # Step 2
-        @socket.write @transfer.peer_id.to_slice          # Step 3
+        @socket.write transfer.info_hash                 # Step 2
+        @socket.write transfer.peer_id.to_slice          # Step 3
 
         @log.debug "Waiting for handshake response..."
         handshake_sent.emit
@@ -138,17 +138,23 @@ module Torrent
           handshake_received.emit
           set_state State::InfoHash
         when State::InfoHash
-          unless @transfer.manager.accept_info_hash?(data)
+          unless @manager.accept_info_hash?(data)
             raise Error.new("Unknown info hash: #{data.inspect}")
           end
 
+          found = @manager.transfer_for_info_hash(data)
+          if t = @transfer
+            raise Error.new("Wrong info hash") if t != found
+          end
+
+          @transfer = found
           info_hash_received.emit(data)
           set_state State::PeerId
         when State::PeerId
           set_state State::PacketSize
 
           @remote_peer_id = data
-          if data == @transfer.peer_id.to_slice
+          if data == transfer.peer_id.to_slice
             @log.error "Lets not connect to ourself"
             close
           end
@@ -158,7 +164,7 @@ module Torrent
 
           if @extension_protocol
             @log.debug "Peer supports the extension protocol, sending handshake"
-            @transfer.manager.extensions.send_handshake(self)
+            @manager.extensions.send_handshake(self)
           end
         end
       end

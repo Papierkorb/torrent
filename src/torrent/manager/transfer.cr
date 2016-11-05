@@ -3,46 +3,94 @@ module Torrent
     # Manager handling a transfer of a single torrent file.
     # Will be extended in the future to handle multiple transfers at once.
     #
-    # Call `#start!` to start the transfer(s).
+    # Add transfers through `#add_transfer` and call `#start!` to start them.
+    # You can add transfers later too.
     class Transfer < Base
       TRACKER_CHECK_INTERVAL = 10.seconds
-
-      # The .torrent file to transfer
-      getter file : Torrent::File
 
       # The used file manager for storage and retrieval
       getter file_manager : FileManager::Base
 
-      # The transfer descriptor
-      getter transfer : Torrent::Transfer do
-        Torrent::Transfer.new(
-          file: @file,
+      # The transfers
+      getter transfers : Array(Torrent::Transfer)
+
+      # List of torrent trackers for each transfer
+      getter trackers : Hash(Torrent::Transfer, Array(Client::Tracker))
+
+      # The listen socket
+      getter listen_socket : TCPServer?
+
+      # Has the manager been started?
+      getter? running : Bool = false
+
+      def initialize(@file_manager : FileManager::Base)
+        super()
+        @trackers = Hash(Torrent::Transfer, Array(Client::Tracker)).new
+        @transfers = Array(Torrent::Transfer).new
+        @log.context = self
+
+        @extensions.add_default_extensions(self)
+      end
+
+      # Adds *transfer* to the manager.  Returns the transfer itself.
+      def add_transfer(transfer : Torrent::Transfer) : Torrent::Transfer
+        @transfers << transfer
+
+        transfer.piece_ready.on do |_peer, piece, _length|
+          broadcast_have_packet(transfer, piece)
+        end
+
+        if @running
+          transfer.start
+          add_trackers_from_transfer transfer
+          add_peers_from_trackers
+        end
+
+        transfer
+      end
+
+      # Adds a new transfer from *file*.  Returns the added `Transfer`.
+      def add_transfer(file : Torrent::File)
+        add_transfer Torrent::Transfer.new(
+          file: file,
           manager: self,
           status: Torrent::Transfer::Status::Running,
         )
       end
 
-      getter listen_socket : TCPServer?
-
-      def initialize(@file : Torrent::File, @file_manager : FileManager::Base)
-        super()
-        @log.context = self
-
-        Cute.connect transfer.piece_ready, broadcast_have_packet(_peer, piece, _length)
-
-        @extensions.add_default_extensions(self)
+      # Resumes a new transfer from *file* with *resume*.  *peer_id* is passed
+      # to `Transfer`, please see it for documentation.
+      # Returns the added `Transfer`.
+      def add_transfer(file : Torrent::File, resume : Hash, peer_id : String | Bool = true)
+        add_transfer Torrent::Transfer.new(
+          resume: resume,
+          file: file,
+          manager: self,
+          peer_id: peer_id,
+        )
       end
 
+      # Returns `true` if there's a running transfer for *info_hash*.
       def accept_info_hash?(info_hash : Bytes) : Bool
-        info_hash == transfer.info_hash
+        # TODO: When transfers can be paused add checks here.
+        find_transfer(info_hash) != nil
       end
 
+      # Tries to find a transfer by *info_hash*.  Raises if not found.
       def transfer_for_info_hash(info_hash : Bytes) : Torrent::Transfer
-        raise Error.new("Unknown info hash #{info_hash.inspect}") if info_hash != transfer.info_hash
-        transfer
+        found = find_transfer(info_hash)
+
+        raise Error.new("Unknown info hash #{info_hash.inspect}") if found.nil?
+
+        found
       end
 
-      def port
+      # Tries to find a transfer by *info_hash*.  If not found, returns `nil`.
+      def find_transfer(info_hash : Bytes) : Torrent::Transfer?
+        @transfers.find{|t| t.info_hash == info_hash}
+      end
+
+      def port : UInt16
         if listen = @listen_socket
           listen.local_address.port
         else
@@ -57,6 +105,7 @@ module Torrent
       # will be raised.
       def start!(bind_address = "0.0.0.0", bind_port = PORT_RANGE)
         super()
+        @running = true
         @listen_socket = create_tcp_server(bind_address, bind_port)
         Util.spawn{ run_accept_loop }
 
@@ -64,9 +113,8 @@ module Torrent
           Util.spawn{ run_peer_loop peer }
         end
 
-        add_trackers_from_file
-
-        transfer.start
+        transfers.each(&.start)
+        transfers.each{|t| add_trackers_from_transfer t}
 
         # Add peers
         Util.spawn do
@@ -99,34 +147,34 @@ module Torrent
 
         loop do
           socket = listen.accept
-          peer = Client::TcpPeer.new(transfer, socket)
+          peer = Client::TcpPeer.new(self, nil, socket)
           @peer_list.add_active_peer peer
         end
       end
 
-      private def add_trackers_from_file
-        added = @file.announce_list.map do |url|
+      private def add_trackers_from_transfer(transfer)
+        added = transfer.file.announce_list.map do |url|
           Client::Tracker.from_url(URI.parse url)
         end
 
-        trackers.concat added
+        trackers[transfer] = added.to_a
       end
 
       private def add_peers_from_trackers
         @log.info "Rechecking trackers for peers where due"
-        trackers.each do |client|
-          add_peer_from_tracker client
+        trackers.each do |transfer, clients|
+          clients.each{|client| add_peer_from_tracker transfer, client}
         end
       end
 
-      private def add_peer_from_tracker(tracker)
-        add_peers tracker.get_peers(transfer) if tracker.retry_due?
+      private def add_peer_from_tracker(transfer, tracker)
+        add_peers transfer, tracker.get_peers(transfer) if tracker.retry_due?
       rescue error
         @log.error "Failed to get peers from tracker #{tracker.url}"
         @log.error error
       end
 
-      private def add_peers(list)
+      private def add_peers(transfer, list)
         list.each do |data|
           @peer_list.add_candidate_bulk transfer, data.address, data.port.to_u16
         end
@@ -134,11 +182,11 @@ module Torrent
         @peer_list.connect_to_candidates
       end
 
-      private def broadcast_have_packet(_peer, piece, _length)
-        @log.info "Announcing ownership of piece #{piece} to peers"
+      private def broadcast_have_packet(transfer, piece)
+        @log.info "Announcing ownership of piece #{piece} to peers of transfer #{transfer}"
 
         Util.spawn do
-          peers.each do |remote_peer|
+          @peer_list.active_peers_of_transfer(transfer).each do |remote_peer|
             begin
               remote_peer.send_have(piece)
             rescue error

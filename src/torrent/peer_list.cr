@@ -81,6 +81,11 @@ module Torrent
       end
     end
 
+    # Returns an Enumerable of all peers which use the *transfer*.
+    def active_peers_of_transfer(transfer)
+      @active_peers.select{|peer| peer.transfer == transfer}
+    end
+
     # Returns `true` if *address:port* is a known candidate OR if it's a
     # connected peer.
     def known?(transfer : Transfer, address : String, port : UInt16) : Bool
@@ -245,7 +250,7 @@ module Torrent
 
     private def create_tcp_peer(transfer, address, port)
       socket = TCPSocket.new(address, port)
-      Client::TcpPeer.new(transfer, socket)
+      Client::TcpPeer.new(transfer.manager, transfer, socket)
     rescue error
       @log.error "Failed connection to peer #{address} #{port}"
       @log.error error
