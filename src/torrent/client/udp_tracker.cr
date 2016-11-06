@@ -86,7 +86,7 @@ module Torrent
 
       # Generates a random transaction id
       private def generate_transaction_id : UInt32
-        Random::DEFAULT.next_u
+        Random::DEFAULT.rand(UInt32::MIN..UInt32::MAX)
       end
 
       # Returns the current connection cookie.  If none has been requested yet,
