@@ -109,7 +109,13 @@ def render_screen(manager, peers, io, runtime)
     ].join
 
     leech = peer.transfer.leech_strategy.as(Torrent::LeechStrategy::Default)
-    name = name.colorize.bold.to_s if leech.fast_peer?(peer)
+
+    begin
+      name = name.colorize.bold.to_s if leech.fast_peer?(peer)
+    rescue
+      # Race condition: If we're rendering after another peer was added but
+      # before the strategy got note of it.
+    end
 
     io.print "#{name.ljust 22} #{up.ljust 12} #{down.ljust 12} #{(readable_size(down_sec) + "/s").ljust(14)} #{flags.ljust 12} #{pieces}\n"
   end

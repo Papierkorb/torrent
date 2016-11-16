@@ -22,6 +22,7 @@ class TestPeer < Torrent::Client::Peer
   setter bitfield
   setter extension_protocol
   setter fast_extension
+  setter dht_protocol
 
   def initialize(transfer)
     super(transfer.manager, transfer)
