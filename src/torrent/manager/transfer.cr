@@ -98,10 +98,10 @@ module Torrent
         end
       end
 
-      # Starts the manager. *bind_address* is the address to bind to.
+      # Starts the manager.  *bind_address* is the address to bind to.
       # *bind_port* can be an integer, or an enumerable giving integers.
       # If it's an enumerable, each port will be tried to bind to until
-      # one is found that can be bound. If no port can be bound, an error
+      # one is found that can be bound.  If no port can be bound, an error
       # will be raised.
       def start!(bind_address = "0.0.0.0", bind_port = PORT_RANGE)
         super()
@@ -168,10 +168,16 @@ module Torrent
       end
 
       private def add_peer_from_tracker(transfer, tracker)
-        add_peers transfer, tracker.get_peers(transfer) if tracker.retry_due?
-      rescue error
-        @log.error "Failed to get peers from tracker #{tracker.url}"
-        @log.error error
+        return unless tracker.retry_due?
+
+        Util.spawn do
+          begin
+            add_peers transfer, tracker.get_peers(transfer)
+          rescue error
+            @log.error "Failed to get peers from tracker #{tracker.url}"
+            @log.error error
+          end
+        end
       end
 
       private def add_peers(transfer, list)
