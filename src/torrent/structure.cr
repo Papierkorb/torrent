@@ -91,26 +91,32 @@ module Torrent
 
       def self.from_bencode(pull)
         list = pull.read_byte_slice
+        from_bytes list
+      end
+
+      def self.from_bytes(list)
         raise "Peer info list must be multiple of 6" unless list.size.divisible_by? 6
 
         Array(PeerInfo).new(list.size / 6) do |idx|
           el = list[idx, 6].pointer(6).as(Native::Data*).value
 
           address = el.address.join(".")
-          PeerInfo.new(address, Util::Endian.to_host(el.port).to_i32, false)
+          PeerInfo.new address, Util::Endian.to_host(el.port).to_i32, false
         end
       end
 
       def self.to_bencode(list, io)
-        converted = Slice(Native::Data).new(list.size) do |idx|
+        to_bytes(list).to_bencode(io)
+      end
+
+      def self.to_bytes(list)
+        Slice(Native::Data).new(list.size) do |idx|
           info = list[idx]
 
           parts = info.address.split('.').map(&.to_u8).to_a
           addr = StaticArray[ parts[0], parts[1], parts[2], parts[3] ]
           Native::Data.new(addr, Util::Endian.to_network(info.port.to_u16))
         end
-
-        converted.to_bencode(io)
       end
     end
 
