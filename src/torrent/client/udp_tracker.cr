@@ -17,16 +17,15 @@ module Torrent
 
       # Builds a client for contacting the tracker at *url*
       def initialize(@url : URI)
-        port = @url.port
-        raise ArgumentError.new("URL does not specify port") if port.nil?
+        raise ArgumentError.new("URL does not specify port") if @url.port.nil?
 
         @log = Util::Logger.new("Tracker/#{@url.host}")
         @socket = Util::UdpSocket.new
-        @socket.connect @url.host.not_nil!, port
       end
 
       # Asks the tracker for peers of *transfer*.  Raises on error.
       def get_peers(transfer : Torrent::Transfer) : Array(Structure::PeerInfo)
+        connect
 
         transaction = nil
         response, addresses = request_loop do |n|
@@ -47,6 +46,10 @@ module Torrent
       # Returns statistics of the given *info_hashes*.  Raises on error.
       def scrape(info_hashes : Enumerable(Bytes)) : Structure::ScrapeResponse
         raise "Not implemented."
+      end
+
+      private def connect
+        @socket.connect @url.host.not_nil!, @url.port.not_nil!
       end
 
       private def check_announce_response(response, transaction)
