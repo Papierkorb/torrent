@@ -25,15 +25,16 @@ module Torrent
         @distances.clear
       end
 
-      # Adds *element* to the sorted element list
-      def <<(element : T) : self
+      # Tries to add *element* to the list.  On success returns `true`, else
+      # returns `false`.
+      def try_add(element : T) : Bool
         dist = element.kademlia_distance(@comparison)
 
         # Make room at the end
         if @array.size >= @max_size
           # Discard if the node list size has been reached and the distance
           # is greater than the farthest distance in the list.
-          return self if dist > @distances.last
+          return false if dist > @distances.last
 
           @array.pop
           @distances.pop
@@ -45,6 +46,12 @@ module Torrent
         @array.insert idx, element
         @distances.insert idx, dist
 
+        true
+      end
+
+      # Adds *element* to the sorted element list
+      def <<(element : T) : self
+        try_add element
         self
       end
     end
