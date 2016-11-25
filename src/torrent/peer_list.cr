@@ -5,6 +5,9 @@ module Torrent
     # Default maximum of concurrently connected peers
     MAX_DEFAULT_PEERS = 40
 
+    # Maximum of candidates to hold at any time
+    MAX_CANDIDATES = 1000
+
     record Candidate,
       transfer : Torrent::Transfer,
       address : String,
@@ -116,6 +119,11 @@ module Torrent
     #
     # Use `#connect_to_candidates` afterwards.
     def add_candidate_bulk(transfer : Transfer, address : String, port : UInt16) : Bool
+      if @candidates.size >= MAX_CANDIDATES
+        @log.info "Rejecting candidate #{address} #{port}: Max candidate count reached."
+        return false
+      end
+
       ranking = check_candidate_ranking(transfer, address, port)
       return false if ranking < 1
 
