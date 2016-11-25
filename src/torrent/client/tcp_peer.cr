@@ -67,7 +67,8 @@ module Torrent
 
         # See `Torrent::Wire` documentation for an explanation of the handshake
         # packet flow.
-        @socket.write Protocol::Handshake.create.to_bytes # Step 1
+        handshake = Protocol::Handshake.create(dht: @manager.use_dht?)
+        @socket.write handshake.to_bytes                 # Step 1
         @socket.write transfer.info_hash                 # Step 2
         @socket.write transfer.peer_id.to_slice          # Step 3
 

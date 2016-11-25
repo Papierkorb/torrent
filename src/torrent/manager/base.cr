@@ -7,7 +7,12 @@ module Torrent
 
     # Base class for connection managers
     abstract class Base
+      # This is the specified port range, but many providers block those, some
+      # trackers even ban peers using one of these ports.  Instead, we're using
+      # a different port range which seems to be used by other torrent clients
+      # too.
       # PORT_RANGE = 6881..6889
+
       PORT_RANGE = 49160..65534
 
       # Send a PING every 2 minutes
@@ -23,10 +28,17 @@ module Torrent
       # Extension manager
       property extensions : Extension::Manager
 
+      # Shall the DHT be used?
+      property? use_dht : Bool = false
+
+      # The DHT manager
+      property dht : Dht::Manager
+
       def initialize
         @log = Util::Logger.new("Torrent::Manager")
         @peer_list = PeerList.new
         @extensions = Extension::Manager.new
+        @dht = Dht::Manager.new
       end
 
       # Returns `true` if the manager accepts the *info_hash*, meaning, it knows
@@ -49,6 +61,8 @@ module Torrent
 
       # Starts a managing fiber to periodically
       protected def start!
+        @dht.start if @use_dht
+
         Util.spawn do
           loop do
             with_rescue("#ping_all_peers"){ ping_all_peers }

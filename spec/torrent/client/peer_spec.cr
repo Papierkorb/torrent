@@ -427,6 +427,30 @@ Spec2.describe Torrent::Client::Peer do
     end
   end
 
+  describe "with DHT protocol support" do
+    before{ subject.dht_protocol = true }
+
+    describe "#send_port" do
+      it "sends a Port packet" do
+        subject.send_port 0x1234u16
+
+        packet = subject.packets.first
+        expect(packet.type).to eq 9u8
+        expect(packet.payload).to eq Slice[ 0x12u8, 0x34u8 ]
+      end
+    end
+  end
+
+  describe "with NO DHT protocol support" do
+    before{ subject.dht_protocol = false }
+
+    describe "#send_port" do
+      it "raises" do
+        expect{ subject.send_port 1234u16 }.to raise_error(Torrent::Client::Error, match /does not support the dht/i)
+      end
+    end
+  end
+
   describe "#handle_packet" do
     context "choke" do
       it "sets the choked by peer flag" do

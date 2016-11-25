@@ -121,6 +121,9 @@ module Torrent
       # Emitted when a allowed fast-list has been received
       Cute.signal fast_list_received(list : Array(UInt32))
 
+      # Emitted when a peer sent its DHT port
+      Cute.signal dht_port_received(port : UInt16)
+
       # Initialized by implementations of this class
       getter log : Util::Logger
 
@@ -129,6 +132,9 @@ module Torrent
 
       # Does the peer support the fast extension (BEP-0006)?
       getter? fast_extension : Bool = false
+
+      # Does the peer support the DHT protocol (BEP-0005)?
+      getter? dht_protocol : Bool = false
 
       # Mapping from the extension name to the id.
       getter extension_map : Hash(String, UInt8)
@@ -153,6 +159,25 @@ module Torrent
       # Sends a close command to the peer
       def close
         @command_channel.send CloseCommand.new
+
+        # Clean up handlers so the GC will eventually eat the peer instance
+        connection_lost.on do
+          handshake_received.disconnect
+          status_bit_set.disconnect
+          status_bit_cleared.disconnect
+          piece_download_completed.disconnect
+          info_hash_received.disconnect
+          handshake_sent.disconnect
+          connection_ready.disconnect
+          connection_lost.disconnect
+          ping_received.disconnect
+          bitfield_received.disconnect
+          have_received.disconnect
+          request_rejected.disconnect
+          piece_suggested.disconnect
+          fast_list_received.disconnect
+          dht_port_received.disconnect
+        end
       end
 
       def max_concurrent_piece_requests
@@ -357,6 +382,14 @@ module Torrent
         send_packet Wire::MessageType::Have.value, have.to_bytes
       end
 
+      # Sends a DHT Port packet, announcing our listening port for incoming DHT
+      # packets.
+      def send_port(port : UInt16)
+        raise Error.new("Peer does not support the DHT") unless @dht_protocol
+        packet = Protocol::DhtPort.new(port)
+        send_packet Wire::MessageType::Port.value, packet.to_bytes
+      end
+
       # Clears the request list **of** the peer.  No notification is sent to the
       # peer.
       def cancel_all_from_peer
@@ -416,6 +449,12 @@ module Torrent
           end
 
           handle_cancel(payload)
+        when Wire::MessageType::Port
+          if payload.size != sizeof(Wire::DhtPort)
+            raise Error.new("Peer sent Port packet of size #{payload.size}, but expected was #{sizeof(Wire::DhtPort)}")
+          end
+
+          handle_port(payload)
         when Wire::MessageType::Extended
           if payload.size < sizeof(Wire::Extended)
             raise Error.new("Peer sent Extended packet of size #{payload.size}, but expected was at least #{sizeof(Wire::Extended)}")
@@ -501,6 +540,13 @@ module Torrent
         @send_queue.delete(cancel)
 
         @log.debug "Peer cancelled requested piece #{cancel.index} [#{cancel.start}, #{cancel.length}]"
+      end
+
+      private def handle_port(payload)
+        dht = Protocol::DhtPort.from(payload)
+        @log.info "Peers DHT port is #{dht.port}"
+
+        dht_port_received.emit dht.port
       end
 
       private def handle_extended(payload)

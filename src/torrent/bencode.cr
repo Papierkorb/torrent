@@ -7,7 +7,7 @@ module Torrent
 
     # Parses the Bencode data in *bytes* and returns the structure.
     def self.load(bytes : Bytes) : Any
-      load(MemoryIO.new bytes)
+      load(IO::Memory.new bytes)
     end
 
     # Parses the Bencode data in *io* and returns the structure.

@@ -222,7 +222,7 @@ module Torrent
     end
 
     # Returns a random 20-characters peer id
-    def self.generate_peer_id(random = Random.new)
+    def self.generate_peer_id(random = Random::DEFAULT)
       max = PEER_ID_CHARS.size
 
       random = Bytes.new(PEER_ID_LENGTH - PEER_ID_PREAMBLE.size) do

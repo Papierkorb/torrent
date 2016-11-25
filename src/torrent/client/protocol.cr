@@ -14,12 +14,16 @@ module Torrent
         )
 
         # Builds a new handshake packet
-        def self.create
+        def self.create(dht = false)
           wire = Wire::Handshake.new
           wire.length = NAME_LEN.to_u8
           NAME.to_slice.copy_to(wire.name.to_slice)
           wire.reserved[5] = 0x10u8 # Extension protocol
-          wire.reserved[7] = 0x04u8 # Fast Extension
+
+          # Fast Extension
+          wire.reserved[7] = 0x04u8
+          # DHT?
+          wire.reserved[7] |= 0x01u8 if dht
 
           self.new(wire)
         end
@@ -30,8 +34,6 @@ module Torrent
 
           protocol = String.new(name.to_slice)
           raise Error.new("Wrong name: #{protocol.inspect}") if protocol != NAME
-
-          # TODO: Verify extensions in `reserved`
         end
 
         def extension_protocol?
@@ -85,6 +87,12 @@ module Torrent
       struct Extended < Util::NetworkOrderStruct(Wire::Extended)
         fields(
           message_id : UInt8,
+        )
+      end
+
+      struct DhtPort < Util::NetworkOrderStruct(Wire::DhtPort)
+        fields(
+          port : UInt16
         )
       end
 

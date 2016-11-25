@@ -38,6 +38,15 @@ Spec2.describe Torrent::Util::KademliaList do
     end
   end
 
+  describe "#try_add" do
+    context "if the element is already in the list" do
+      it "returns false" do
+        expect(subject.try_add b).to be_false
+        expect(subject.to_a).to eq [ c, b, a, g ]
+      end
+    end
+  end
+
   describe "#<<" do
     before do
       subject.clear

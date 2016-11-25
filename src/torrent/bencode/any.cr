@@ -21,6 +21,12 @@ module Torrent
         @type = TokenType::Integer
       end
 
+      # Builds an integer instance out of a `Bool`
+      def initialize(bool : Bool)
+        @integer = bool ? 1i64 : 0i64
+        @type = TokenType::Integer
+      end
+
       # Builds a byte-string instance
       def initialize(bytes : Bytes)
         @byte_string = bytes

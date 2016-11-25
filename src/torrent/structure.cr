@@ -91,32 +91,43 @@ module Torrent
 
       def self.from_bencode(pull)
         list = pull.read_byte_slice
-        from_bytes list
+        from_bytes_list list
       end
 
-      def self.from_bytes(list)
+      def self.from_bytes_list(list)
         raise "Peer info list must be multiple of 6" unless list.size.divisible_by? 6
 
         Array(PeerInfo).new(list.size / 6) do |idx|
-          el = list[idx, 6].pointer(6).as(Native::Data*).value
-
-          address = el.address.join(".")
-          PeerInfo.new address, Util::Endian.to_host(el.port).to_i32, false
+          from_bytes list[idx, 6]
         end
+      end
+
+      def self.from_bytes(bytes)
+        el = bytes.pointer(6).as(Native::Data*).value
+        address = el.address.join(".")
+        PeerInfo.new address, Util::Endian.to_host(el.port).to_i32, false
       end
 
       def self.to_bencode(list, io)
-        to_bytes(list).to_bencode(io)
+        to_bytes_list(list).to_bencode(io)
       end
 
-      def self.to_bytes(list)
+      def self.to_bytes_list(list)
         Slice(Native::Data).new(list.size) do |idx|
           info = list[idx]
-
-          parts = info.address.split('.').map(&.to_u8).to_a
-          addr = StaticArray[ parts[0], parts[1], parts[2], parts[3] ]
-          Native::Data.new(addr, Util::Endian.to_network(info.port.to_u16))
+          to_native(info.address, info.port.to_u16)
         end
+      end
+
+      def self.to_native(address : String, port : UInt16)
+        parts = address.split('.').map(&.to_u8).to_a
+        data = uninitialized Native::Data
+        data.address[0] = parts[0]
+        data.address[1] = parts[1]
+        data.address[2] = parts[2]
+        data.address[3] = parts[3]
+        data.port = Util::Endian.to_network(port)
+        data
       end
     end
 

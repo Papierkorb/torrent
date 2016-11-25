@@ -45,6 +45,9 @@ module Torrent
       Piece = 7
       Cancel = 8
 
+      # BEP-0005: DHT Protocol
+      Port = 9
+
       # BEP-0006: Fast Extension
 
       SuggestPiece = 0x0D
@@ -98,6 +101,11 @@ module Torrent
     @[Packed]
     struct Extended
       message_id : UInt8
+    end
+
+    @[Packed]
+    struct DhtPort
+      port : UInt16
     end
 
     # UDP tracker protocol

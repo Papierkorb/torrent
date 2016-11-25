@@ -81,7 +81,7 @@ Spec2.describe "Torrent::Util::NetworkOrderStruct" do
       it "returns a populated instance" do
         data = StaticArray[ 0x11u8, 0x22u8, 0x33u8, 0x44u8, 0x1u8, 0x2u8, 0x3u8, 0x4u8 ]
 
-        io = MemoryIO.new(data.to_slice)
+        io = IO::Memory.new(data.to_slice)
         test = Test.from(io)
         expect(test.integer).to eq 0x11223344
         expect(test.array).to eq StaticArray[ 1i8, 2i8, 3i8, 4i8 ]
