@@ -53,7 +53,7 @@ module Torrent
 
       # Creates an instance from the *input*
       def self.from_bencode(input : Bytes)
-        from_bencode(MemoryIO.new(input))
+        from_bencode(IO::Memory.new(input))
       end
 
       # ditto

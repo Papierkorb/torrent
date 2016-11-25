@@ -1,5 +1,5 @@
 private def pull_parser(input : Bytes)
-  pull_parser(MemoryIO.new input)
+  pull_parser(IO::Memory.new input)
 end
 
 private def pull_parser(input : IO)
@@ -132,7 +132,7 @@ end
 
 class Object
   def to_bencode : Bytes
-    io = MemoryIO.new
+    io = IO::Memory.new
     to_bencode(io)
     io.to_slice
   end

@@ -1,7 +1,7 @@
 require "../../spec_helper"
 
 private def pull(string)
-  lexer = Torrent::Bencode::Lexer.new(MemoryIO.new(string.to_slice))
+  lexer = Torrent::Bencode::Lexer.new(IO::Memory.new(string.to_slice))
   Torrent::Bencode::PullParser.new(lexer)
 end
 
