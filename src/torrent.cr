@@ -3,6 +3,9 @@ require "uri"
 require "http/client"
 require "logger"
 
+# DHT specific requires
+require "big"
+
 # External shards
 require "cute" # Shard, github.com/Papierkorb/cute
 
@@ -32,3 +35,4 @@ require "./torrent/file_manager/*"
 require "./torrent/client/*"
 require "./torrent/extension/*"
 require "./torrent/leech_strategy/*"
+require "./torrent/dht/*"

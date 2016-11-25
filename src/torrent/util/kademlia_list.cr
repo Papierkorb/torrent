@@ -17,17 +17,27 @@ module Torrent
         @array
       end
 
-      delegate :[], :[]?, each, size, to: @array
+      delegate :[], :[]?, each, size, unsafe_at, to: @array
 
-      # Clears the list of all elemenets
-      def clear
+      # Clears the list of all elemenets.  Also lets the user reset the
+      # comparison value.
+      def clear(comparison : BigInt = @comparison)
+        @comparison = comparison
         @array.clear
         @distances.clear
       end
 
+      # Takes out the first element of the list and returns it.
+      def shift : T
+        @distances.shift
+        @array.shift
+      end
+
       # Tries to add *element* to the list.  On success returns `true`, else
-      # returns `false`.
+      # returns `false`.  If the list already contains *element*, `false` is
+      # returned.
       def try_add(element : T) : Bool
+        return false if @array.includes?(element)
         dist = element.kademlia_distance(@comparison)
 
         # Make room at the end
@@ -40,7 +50,7 @@ module Torrent
           @distances.pop
         end
 
-        idx = @distances.index{|other| other >= dist}
+        idx = @distances.index(&.>=(dist))
         idx = @array.size if idx.nil?
 
         @array.insert idx, element
