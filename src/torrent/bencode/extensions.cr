@@ -105,9 +105,12 @@ class Array(T)
   end
 end
 
-abstract struct Enum
+struct Enum
   def self.new(pull : Torrent::Bencode::PullParser) : self
-    from_value pull.read_integer
+    {% begin %}
+      klass = {{@type}}::{{ @type.constants.first }}.value.class
+      from_value klass.new(pull.read_integer)
+    {% end %}
   end
 
   def to_bencode(io : IO) : IO
