@@ -32,6 +32,7 @@ Please see `bin/` for example applications.
 The index of all BEPs can be found at http://www.bittorrent.org/beps/bep_0000.html
 
 * BEP-0003: The BitTorrent Protocol Specification
+* BEP-0005: DHT Protocol (*Experimental*)
 * BEP-0006: Fast Extension
 * BEP-0010: Extension Protocol
 * BEP-0011: Peer Exchange (PEX)
@@ -44,7 +45,6 @@ The index of all BEPs can be found at http://www.bittorrent.org/beps/bep_0000.ht
 
 ### Planned
 
-* BEP-0005: DHT Protocol
 * BEP-0009: Extension for Peers to Send Metadata Files
 * BEP-0040: Canonical Peer Priority
 
