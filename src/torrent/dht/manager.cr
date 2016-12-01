@@ -195,7 +195,6 @@ module Torrent
           @log.info "Looking for more near nodes."
           find_node(@nodes.node_id)
           @log.info "Initial node search done, node count: #{@nodes.count}"
-          @nodes.debug_dump{|a| puts a}
           bootstrap_finished.emit
         end
       end
