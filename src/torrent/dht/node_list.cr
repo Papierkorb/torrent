@@ -55,6 +55,7 @@ module Torrent
       # if the node was accepted, else `false` is returned.  If the node is
       # already known, `false` is returned.
       def try_add(node : Node) : Bool
+        return false if node.id == @node_id
         bucket = find_bucket(node.id)
 
         if bucket.includes?(node)
@@ -78,6 +79,7 @@ module Torrent
       # Checks if a node with *node_id* would be accepted or flat out be
       # rejected.
       def would_accept?(node_id : BigInt) : Bool
+        return false if node_id == @node_id
         bucket = find_bucket(node_id)
         return false if bucket.includes?(node_id)
 
