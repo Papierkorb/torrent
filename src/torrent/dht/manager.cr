@@ -14,6 +14,10 @@ module Torrent
         # { "router.transmissionbt.org", 6881u16 },
       ]
 
+      # Interval after which the manager will try to find this node in the
+      # swarm.  Used to announce our existence every once in a while.
+      SELF_FIND_INTERVAL = 15.minutes
+
       # Emitted when bootstrapping started.
       Cute.signal bootstrap_started
 
@@ -106,7 +110,15 @@ module Torrent
         @port = bind_socket bind_address, bind_port
 
         Util.spawn("DHT-UDP"){ handle_incoming }
-        connect_to_bootstrap_nodes
+        connect_to_bootstrap_nodes unless @bootstrap_nodes.empty?
+
+        Util.spawn("Self find") do
+          while @port
+            sleep SELF_FIND_INTERVAL
+            @log.info "Looking for ourselves"
+            find_self
+          end
+        end
 
         Util.spawn("Peer+NodeList management") do
           while @port
@@ -175,6 +187,12 @@ module Torrent
         PeersFinder.new(self).run(info_hash)
       end
 
+      # Runs a `#find_node` on this nodes id.  This is used to find more nodes
+      # near ours.
+      def find_self
+        find_node(@nodes.node_id)
+      end
+
       private def connect_to_bootstrap_nodes
         ch = Channel(Nil).new
         count = @bootstrap_nodes.size
@@ -193,7 +211,7 @@ module Torrent
         Util.spawn("Self finder") do
           count.times{ ch.receive }
           @log.info "Looking for more near nodes."
-          find_node(@nodes.node_id)
+          find_self
           @log.info "Initial node search done, node count: #{@nodes.count}"
           bootstrap_finished.emit
         end
