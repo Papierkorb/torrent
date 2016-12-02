@@ -114,6 +114,27 @@ module Torrent
         end
       end
 
+      # Refreshes the bucket.  This means that all nodes, which we've not seen
+      # for 15 minutes, will be pinged.  If they respond everything is fine.
+      # If they do not, their health will worsen.  If their health goes
+      # `Node::Health::Bad`, the node will be evicted from the bucket.
+      #
+      # This basically means that an unhealthy node is given two chances over
+      # a period of 15 minutes to stabilize again.
+      #
+      # If however the "ping" invocation raises an error the node will be
+      # evicted right away.  This happens if the node changed its node id.
+      def refresh(this_nodes_id) : Nil
+        @nodes.select! do |node|
+          if node.refresh_if_needed(this_nodes_id)
+            true
+          else
+            node.close
+            false
+          end
+        end
+      end
+
       private def calculate_middle
         (@range.end - @range.begin) / 2 + @range.begin
       end

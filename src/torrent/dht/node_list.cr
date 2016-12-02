@@ -161,8 +161,8 @@ module Torrent
       end
 
       # Refreshes all buckets
-      def refresh_buckets
-        # TODO
+      def refresh_buckets : Nil
+        @buckets.each(&.refresh(@node_id))
       end
 
       # Yields each `Node` in the node list.

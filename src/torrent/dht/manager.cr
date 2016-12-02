@@ -122,7 +122,8 @@ module Torrent
 
         Util.spawn("Peer+NodeList management") do
           while @port
-            @peers.each{|list| list.check_timeouts}
+            @peers.each(&.check_timeouts)
+            @nodes.refresh_buckets
             sleep 1.minute
           end
         end
