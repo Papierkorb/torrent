@@ -176,8 +176,13 @@ module Torrent
         start = Time.now
         old_seen = @last_seen
         result = remote_call?("ping", { "id" => Bencode::Any.new(id) }, timeout)
-        @rtt = Time.now - start
-        @log.info "Node responded to ping after #{@rtt}"
+
+        if result
+          @rtt = Time.now - start
+          @log.info "Node responded to ping after #{@rtt}"
+        else
+          @log.info "Ping timed out after #{timeout}"
+        end
 
         if result.is_a?(Structure::Response)
           Util::Gmp.import_sha1 result.data["id"].to_slice
@@ -267,6 +272,7 @@ module Torrent
         return true if Time.now < @last_seen + TIMEOUT
 
         ping(this_nodes_id, timeout: timeout)
+        @log.debug "Node refreshed, health: #{@health}"
 
         # Force last_seen update to give the node time to recover
         @last_seen = Time.now
