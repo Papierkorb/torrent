@@ -2,11 +2,29 @@ module Torrent
   module Dht
     # Represents a torrent DHT node
     abstract class Node
+      enum Health
+
+        # The node is most likely reachable
+        Good
+
+        # The node may not be reachable anymore
+        Questionable
+
+        # Multiple attempts failed to reach the node
+        Bad
+      end
+
       # Default remote call timeout
-      TIMEOUT = 30.seconds
+      CALL_TIMEOUT = 30.seconds
+
+      # Default ping timeout
+      PING_TIMEOUT = 10.seconds
 
       # Byte size of query transactions
       TRANSACTION_LENGTH = 2
+
+      # Node timeout.  Double this for the real timeout.
+      TIMEOUT = 15.minutes
 
       # The node id.  This may be set to `-1` initially.
       property id : BigInt
@@ -18,6 +36,11 @@ module Torrent
       # The token to be used by the remote node for "announce_peer" queries sent
       # to this node.
       property remote_token : Bytes?
+
+      # The health of the node
+      getter health : Health = Health::Good
+
+      delegate good?, questionable?, bad?, to: @health
 
       # Emitted when the connection timed-out.
       Cute.signal connection_lost
@@ -38,9 +61,13 @@ module Torrent
       # ping and receiving the response.  Initially set to the max value.
       getter rtt : Time::Span = Time::Span::MaxValue
 
+      # Returns the time the last packet has been received from this node.
+      getter last_seen : Time
+
       def initialize(@id : BigInt)
         @log = Util::Logger.new("Node/#{@id.hash}")
         @calls = Hash(Bytes, Channel(Structure::Message?)).new
+        @last_seen = Time.now
       end
 
       def_hash @id
@@ -92,6 +119,8 @@ module Torrent
         any = Bencode.load(datagram)
         message = Structure::Message.from(any)
 
+        # Don't update @last_seen here, as the node may only be able to reach
+        # us, but may be firewalled from requests by us.
         message_received.emit message
         handle_message message
       end
@@ -100,7 +129,10 @@ module Torrent
       # response has arrived or the timeout has passed.  Returns the response
       # mesage, which is either a `Structure::Response` or `Structure::Error` or
       # `nil` if the timeout was triggered.
-      def remote_call?(method : String, arguments : Bencode::Any::AnyHash, timeout = TIMEOUT)
+      #
+      # The `last_seen` property is updated for responses and error responses,
+      # but not on timeout.
+      def remote_call?(method : String, arguments : Bencode::Any::AnyHash, timeout = CALL_TIMEOUT)
         transaction = generate_unique_transaction
         query = Structure::Query.new(transaction, method, arguments)
 
@@ -111,13 +143,15 @@ module Torrent
 
         result = wait_on_channel ch, timeout
         @calls.delete transaction
+        update_health result.nil?
         learn_or_reject_node(result) if result.is_a?(Structure::Response)
+        @last_seen = Time.now if result
         result
       end
 
       # Like `#remote_call?`, but raises a `Dht::CallError` sub-class on any
       # error.  Else, the result `Bencode::Any::AnyHash` is returned.
-      def remote_call(method : String, arguments : Bencode::Any::AnyHash, timeout = TIMEOUT)
+      def remote_call(method : String, arguments : Bencode::Any::AnyHash, timeout = CALL_TIMEOUT)
         result = remote_call?(method, arguments, timeout)
 
         if result.nil?
@@ -133,24 +167,29 @@ module Torrent
       # This is a blocking method, which either returns the remote nodes id,
       # or `nil` if it did not respond.  This method may raise, but will
       # **not** raise on 1) error responses and 2) timeouts.
-      def ping(this_nodes_id : BigInt | Bytes, timeout = TIMEOUT) : BigInt?
+      #
+      # The `last_seen` property is only updated if a successful response was
+      # received.
+      def ping(this_nodes_id : BigInt | Bytes, timeout = PING_TIMEOUT) : BigInt?
         id = convert_node_id this_nodes_id
 
         start = Time.now
+        old_seen = @last_seen
         result = remote_call?("ping", { "id" => Bencode::Any.new(id) }, timeout)
         @rtt = Time.now - start
         @log.info "Node responded to ping after #{@rtt}"
 
-        return nil unless result.is_a?(Structure::Response)
-        remote_id = Util::Gmp.import_sha1 result.data["id"].to_slice
-        @id = remote_id if @id == -1
-
-        remote_id
+        if result.is_a?(Structure::Response)
+          Util::Gmp.import_sha1 result.data["id"].to_slice
+        else
+          @last_seen = old_seen
+          nil
+        end
       end
 
       # Sends a "find_node" query to the remote node to find the *target* node.
       # Raises on any error.
-      def find_node(this_nodes_id : BigInt | Bytes, target : BigInt | Bytes, timeout = TIMEOUT) : Array(NodeAddress)
+      def find_node(this_nodes_id : BigInt | Bytes, target : BigInt | Bytes, timeout = CALL_TIMEOUT) : Array(NodeAddress)
         id = convert_node_id this_nodes_id
         dest = convert_node_id target
 
@@ -169,7 +208,7 @@ module Torrent
       #
       # Usually, only one of the two is returned, but a DHT node could return
       # values for both anyway.  Raises if the invocation fails.
-      def get_peers(this_nodes_id : BigInt | Bytes, info_hash : BigInt | Bytes, timeout = TIMEOUT) : Tuple(Array(NodeAddress), Array(Torrent::Structure::PeerInfo))
+      def get_peers(this_nodes_id : BigInt | Bytes, info_hash : BigInt | Bytes, timeout = CALL_TIMEOUT) : Tuple(Array(NodeAddress), Array(Torrent::Structure::PeerInfo))
         id = convert_node_id this_nodes_id
         result = remote_call("get_peers", {
           "id" => Bencode::Any.new(id),
@@ -200,7 +239,7 @@ module Torrent
       # `#get_peers` beforehand to acquire a peer token from the remote node.
       #
       # The *port* is the port this peer is listening on.
-      def announce_peer(this_nodes_id : BigInt | Bytes, info_hash : BigInt | Bytes, port : Int, timeout = TIMEOUT) : Nil
+      def announce_peer(this_nodes_id : BigInt | Bytes, info_hash : BigInt | Bytes, port : Int, timeout = CALL_TIMEOUT) : Nil
         token = @peers_token
         raise Error.new("No peers_token present, call #get_peers") if token.nil?
 
@@ -213,6 +252,28 @@ module Torrent
         }, timeout: timeout)
 
         nil
+      end
+
+      # Pings the remote node if the node hasn't been seen for `TIMEOUT`.
+      # Returns `true` if the node hasn't gone to bad health, returns `false`
+      # if the health is or has gone bad.
+      #
+      # If the remote node responds with the wrong node id, the health will be
+      # set to `Health::Bad` and `false` is returned.
+      #
+      # The *timeout* is used as the `#ping` timeout.
+      def refresh_if_needed(this_nodes_id, timeout = PING_TIMEOUT) : Bool
+        return false if @health.bad?
+        return true if Time.now < @last_seen + TIMEOUT
+
+        ping(this_nodes_id, timeout: timeout)
+
+        # Force last_seen update to give the node time to recover
+        @last_seen = Time.now
+        !@health.bad?
+      rescue
+        @health = Health::Bad
+        false
       end
 
       def to_s(io)
@@ -300,6 +361,16 @@ module Torrent
           @id = sent_id
         elsif @id != sent_id
           raise CallError.new("Sent id #{sent_id} does not match previous id #{@id}")
+        end
+      end
+
+      private def update_health(failure)
+        if failure == false
+          @health = Health::Good
+        elsif @health.good?
+          @health = Health::Questionable
+        elsif @health.questionable?
+          @health = Health::Bad
         end
       end
     end

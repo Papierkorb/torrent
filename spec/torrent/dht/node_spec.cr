@@ -31,7 +31,9 @@ Spec2.describe Torrent::Dht::Node do
   # "abcdef0123456789abcd"
   let(:remote_id_bytes){ Torrent::Util::Gmp.export_sha1 remote_id }
 
+  let(:last_seen){ Time.now - 20.minutes }
   subject{ node remote_id - 100 }
+  before{ subject.last_seen = last_seen }
 
   describe "#hash" do
     it "compares based on the id" do
@@ -93,6 +95,8 @@ Spec2.describe Torrent::Dht::Node do
       it "returns the response" do
         receive_later(subject, packet)
         response = subject.remote_call?("foo", args)
+        expect(subject.last_seen).not_to eq last_seen
+        expect(subject.health.good?).to be_true
 
         expect(response).to be_a Torrent::Dht::Structure::Response
         r = response.as(Torrent::Dht::Structure::Response)
@@ -106,6 +110,8 @@ Spec2.describe Torrent::Dht::Node do
       it "returns the error" do
         receive_later(subject, packet)
         error = subject.remote_call?("foo", args)
+        expect(subject.last_seen).not_to eq last_seen
+        expect(subject.health.good?).to be_true
 
         expect(error).to be_a Torrent::Dht::Structure::Error
         e = error.as(Torrent::Dht::Structure::Error)
@@ -118,6 +124,18 @@ Spec2.describe Torrent::Dht::Node do
       it "returns nil" do
         result = subject.remote_call?("foo", args, timeout: 10.milliseconds)
         expect(result).to be_nil
+        expect(subject.last_seen).to eq last_seen
+        expect(subject.health.questionable?).to be_true
+      end
+
+      context "and the health is questionable" do
+        it "goes to bad" do
+          subject.health = Torrent::Dht::Node::Health::Questionable
+          result = subject.remote_call?("foo", args, timeout: 10.milliseconds)
+          expect(result).to be_nil
+          expect(subject.last_seen).to eq last_seen
+          expect(subject.health.bad?).to be_true
+        end
       end
     end
   end
@@ -186,6 +204,7 @@ Spec2.describe Torrent::Dht::Node do
         receive_later subject, "d1:t2:xy1:y1:r1:rd2:id20:abcdef0123456789abcdee"
         expect(subject.ping my_id).to eq remote_id
 
+        expect(subject.last_seen).not_to eq last_seen
         expect(subject.rtt).to_be < 1.second
         expect(subject.sent.size).to eq 1
         expect(subject.sent.first).to be_a(Torrent::Dht::Structure::Query)
@@ -199,6 +218,7 @@ Spec2.describe Torrent::Dht::Node do
     context "on error response" do
       it "returns nil" do
         receive_later subject, "d1:t2:xy1:y1:e1:eli201e2:?!ee"
+        expect(subject.last_seen).to eq last_seen
         expect(subject.ping my_id).to be_nil
 
         expect(subject.sent.size).to eq 1
@@ -319,6 +339,71 @@ Spec2.describe Torrent::Dht::Node do
           "port" => Torrent::Bencode::Any.new(4567),
           "token" => Torrent::Bencode::Any.new("abc".to_slice),
         })
+      end
+    end
+  end
+
+  describe "#refresh_if_needed" do
+    context "if health is already bad" do
+      before{ subject.health = Torrent::Dht::Node::Health::Bad }
+      it "returns false" do
+        expect(subject.refresh_if_needed my_id).to be_false
+      end
+    end
+
+    context "if last_seen has not timeouted yet" do
+      before{ subject.last_seen = Time.now }
+      it "returns true" do
+        expect(subject.refresh_if_needed my_id).to be_true
+      end
+    end
+
+    context "if the remote node responds to a ping" do
+      it "returns true" do
+        receive_later subject, "d1:t2:xy1:y1:r1:rd2:id20:abcdef0123456789abcdee"
+        expect(subject.refresh_if_needed my_id).to be_true
+        expect(subject.last_seen).not_to eq last_seen
+        expect(subject.sent.size).to eq 1
+
+        q = subject.sent.first.as(Torrent::Dht::Structure::Query)
+        expect(q.method).to eq "ping"
+      end
+    end
+
+    context "if the remote node does not respond" do
+      let(:timeout){ 10.milliseconds }
+
+      context "a second time" do
+        before{ subject.health = Torrent::Dht::Node::Health::Questionable }
+        it "returns false" do
+          expect(subject.refresh_if_needed my_id, timeout).to be_false
+          expect(subject.last_seen).not_to eq last_seen
+          expect(subject.health.bad?).to be_true
+        end
+      end
+
+      context "but responds the second time" do
+        before{ subject.health = Torrent::Dht::Node::Health::Questionable }
+        it "returns true" do
+          receive_later subject, "d1:t2:xy1:y1:r1:rd2:id20:abcdef0123456789abcdee"
+          expect(subject.refresh_if_needed my_id).to be_true
+          expect(subject.last_seen).not_to eq last_seen
+          expect(subject.health.good?).to be_true
+        end
+      end
+
+      it "returns true" do
+        expect(subject.refresh_if_needed my_id, timeout).to be_true
+        expect(subject.last_seen).not_to eq last_seen
+        expect(subject.health.questionable?).to be_true
+      end
+    end
+
+    context "if the remote node responds with the wrong id" do
+      it "returns false" do
+        receive_later subject, "d1:t2:xy1:y1:r1:rd2:id20:77777777777777777777ee"
+        expect(subject.refresh_if_needed my_id).to be_false
+        expect(subject.health.bad?).to be_true
       end
     end
   end

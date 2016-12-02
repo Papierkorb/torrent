@@ -18,6 +18,8 @@ end
 class TestNode < Torrent::Dht::Node
   getter sent : Array(Torrent::Dht::Structure::Message)
   setter peers_token
+  setter last_seen
+  setter health
 
   def initialize(id)
     super
