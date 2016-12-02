@@ -1,11 +1,14 @@
 module Torrent
   module Dht
     # Implementations of the RPC methods per BEP-0005.
+    # You usually don't use this class directly, the `Dht::Manager` does it for
+    # you.
     class DefaultRpcMethods
       def initialize(@manager : Manager, @dispatcher : Dispatcher, @log : Util::Logger)
         @my_id = Bencode::Any.new(Util::Gmp.export_sha1 @manager.nodes.node_id)
       end
 
+      # Adds all default BitTorrent DHT methods
       def add_all
         add_ping
         add_find_node
@@ -13,6 +16,8 @@ module Torrent
         add_announce_peer
       end
 
+      # Adds the "ping" method.  All it does is to send response containing this
+      # nodes id.
       def add_ping
         @dispatcher.add "ping" do |node, query|
           @log.info "Received ping from #{node.remote_address}"

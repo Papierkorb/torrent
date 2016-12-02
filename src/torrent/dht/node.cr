@@ -64,6 +64,8 @@ module Torrent
       # Returns the time the last packet has been received from this node.
       getter last_seen : Time
 
+      # Creates a node known as *id*.  If the node id is not known yet, you may
+      # pass `-1` as placeholder.
       def initialize(@id : BigInt)
         @log = Util::Logger.new("Node/#{@id.hash}")
         @calls = Hash(Bytes, Channel(Structure::Message?)).new
@@ -72,14 +74,10 @@ module Torrent
 
       def_hash @id
 
-      # Returns a `NodeAddress`
+      # Returns the remote address as a `NodeAddress`
       def to_address : NodeAddress
         remote = remote_address
         NodeAddress.new(remote.address, remote.port, @id, !remote.family.inet?)
-      end
-
-      # Tries to add a peer at *address:port* for *info_hash*.
-      def add_torrent_peer(info_hash : Bytes, address : String, port : UInt16)
       end
 
       # Calculates the distance to *other* from this node using the Kademlia
@@ -194,6 +192,9 @@ module Torrent
 
       # Sends a "find_node" query to the remote node to find the *target* node.
       # Raises on any error.
+      #
+      # The returned array contains addresses of returned nodes.  Use
+      # `Dht::Manager#find_or_connect_node` to easily connect to one.
       def find_node(this_nodes_id : BigInt | Bytes, target : BigInt | Bytes, timeout = CALL_TIMEOUT) : Array(NodeAddress)
         id = convert_node_id this_nodes_id
         dest = convert_node_id target
@@ -282,6 +283,8 @@ module Torrent
         false
       end
 
+      # Writes a loggable string into *io* containing the remote address and
+      # node id.
       def to_s(io)
         io.print "<Dht::Node #{remote_address} / "
 
