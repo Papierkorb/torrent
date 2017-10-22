@@ -4,10 +4,7 @@ module Torrent
       MTU = 1500
 
       def read(buffer, timeout)
-        result = IO.select([ self ], nil, [ self ], timeout)
-
-        raise IO::Timeout.new("No data received after #{timeout} seconds") if result.nil?
-
+        self.read_timeout = timeout
         read(buffer)
       end
     end
