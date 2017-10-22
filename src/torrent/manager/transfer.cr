@@ -92,7 +92,7 @@ module Torrent
 
       def port : UInt16
         if listen = @listen_socket
-          listen.local_address.port
+          listen.local_address.port.to_u16
         else
           raise Error.new("You need to call #start! before calling #port")
         end

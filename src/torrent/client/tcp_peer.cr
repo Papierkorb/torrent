@@ -36,7 +36,7 @@ module Torrent
       end
 
       def port : UInt16
-        @socket.remote_address.port
+        @socket.remote_address.port.to_u16
       end
 
       def run_once

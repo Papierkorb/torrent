@@ -77,7 +77,7 @@ module Torrent
       # Returns the remote address as a `NodeAddress`
       def to_address : NodeAddress
         remote = remote_address
-        NodeAddress.new(remote.address, remote.port, @id, !remote.family.inet?)
+        NodeAddress.new(remote.address, remote.port.to_u16, @id, !remote.family.inet?)
       end
 
       # Calculates the distance to *other* from this node using the Kademlia
