@@ -44,15 +44,15 @@ module Torrent
         raise Error.new("Manager is not listening on a port") if port.nil?
 
         url = @url.dup
-        url.query = HTTP::Params.from_hash({
-          "peer_id" => transfer.peer_id,
-          "info_hash" => String.new(transfer.info_hash),
-          "port" => port.to_s,
-          "uploaded" => transfer.uploaded.to_s,
-          "downloaded" => transfer.downloaded.to_s,
-          "left" => transfer.left.to_s,
-          "event" => status_string(transfer.status),
-          "compact" => "1",
+        url.query = HTTP::Params.encode({
+          peer_id: transfer.peer_id,
+          info_hash: String.new(transfer.info_hash),
+          port: port.to_s,
+          uploaded: transfer.uploaded.to_s,
+          downloaded: transfer.downloaded.to_s,
+          left: transfer.left.to_s,
+          event: status_string(transfer.status),
+          compact: "1",
         })
 
         # Note: We only support `compact` responses. Nowadays, trackers either
