@@ -28,7 +28,7 @@ class TestNode < Torrent::Dht::Node
   end
 
   def remote_address
-    Socket::IPAddress.new(Socket::Family::INET, "1.2.3.4", 12345)
+    Socket::IPAddress.new("1.2.3.4", 12345)
   end
 
   def close
